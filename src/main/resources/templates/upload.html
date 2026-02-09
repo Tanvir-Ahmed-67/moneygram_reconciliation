@@ -20,7 +20,7 @@
             <p class="text-muted small">Select your documents to proceed</p>
           </div>
 
-          <form method="POST" enctype="multipart/form-data" action="/upload">
+          <form method="POST" enctype="multipart/form-data" th:action="@{/upload}">
 
             <div class="mb-3">
               <label for="payment_file" class="form-label fw-semibold text-muted">Payment File</label>

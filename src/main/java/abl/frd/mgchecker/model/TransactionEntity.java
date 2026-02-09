@@ -9,7 +9,7 @@ import javax.persistence.*;
 @Table(
         name = "transaction",
         indexes = {
-                @Index(name = "idx_recon_key", columnList = "transaction_no,account_no,amount"),
+                @Index(name = "idx_recon_key", columnList = "transaction_no,amount,legacy_id"),
                 @Index(name = "idx_status", columnList = "reconStatus"),
                 @Index(name = "idx_source", columnList = "sourceType")
         }
@@ -21,10 +21,6 @@ public class TransactionEntity {
     private int  id;
     @Column(name = "transaction_no", length=30, nullable = false)
     private String transactionNo;
-    @Column(name = "currency", length=32)
-    private String currency;
-    @Column(name = "account_no", length=32)
-    private String accountNo;
     @Column(name = "amount", length = 15, nullable = false)
     private Double amount;
     @Column(name = "transaction_date", length=30)
@@ -32,6 +28,8 @@ public class TransactionEntity {
     @Column(name = "file_upload_date", length=30)
     private String fileUploadDate;
 
+    @Column(name = "legacy_id", length=30)
+    private String legacyId;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SourceType sourceType;
@@ -54,22 +52,6 @@ public class TransactionEntity {
 
     public void setTransactionNo(String transactionNo) {
         this.transactionNo = transactionNo;
-    }
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
-
-    public String getAccountNo() {
-        return accountNo;
-    }
-
-    public void setAccountNo(String accountNo) {
-        this.accountNo = accountNo;
     }
 
     public Double getAmount() {
@@ -110,5 +92,13 @@ public class TransactionEntity {
 
     public void setReconStatus(ReconStatus reconStatus) {
         this.reconStatus = reconStatus;
+    }
+
+    public String getLegacyId() {
+        return legacyId;
+    }
+
+    public void setLegacyId(String legacyId) {
+        this.legacyId = legacyId;
     }
 }

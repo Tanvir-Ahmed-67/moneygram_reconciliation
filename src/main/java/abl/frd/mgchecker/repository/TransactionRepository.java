@@ -16,7 +16,7 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     List<TransactionEntity> findByReconStatusAndSourceType(
             ReconStatus status, SourceType sourceType);
     // JPQL query for exact matches
-    @Query("SELECT p.id, s.id FROM TransactionEntity p JOIN TransactionEntity s ON p.transactionNo = s.transactionNo AND p.currency = s.currency AND p.amount = s.amount AND p.transactionDate = s.transactionDate WHERE p.sourceType = :paymentType AND s.sourceType = :settlementType AND p.reconStatus = :status AND s.reconStatus = :status")
+    @Query("SELECT p.transactionNo, s.transactionNo FROM TransactionEntity p JOIN TransactionEntity s ON p.transactionNo = s.transactionNo AND p.amount = s.amount AND p.legacyId = s.legacyId WHERE p.sourceType = :paymentType AND s.sourceType = :settlementType AND p.reconStatus = :status AND s.reconStatus = :status")
     List<Object[]> findExactMatches(
             @Param("paymentType") SourceType paymentType,
             @Param("settlementType") SourceType settlementType,
@@ -24,11 +24,10 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     );
     List<TransactionEntity> findByReconStatus(ReconStatus status);
     @Modifying
-    @Query("UPDATE TransactionEntity t SET t.reconStatus = :status WHERE t.id = :id")
+    @Query("UPDATE TransactionEntity t SET t.reconStatus = :status WHERE t.transactionNo = :id")
     void updateStatus(@Param("id") String id, @Param("status") ReconStatus status);
-    List<TransactionEntity> findByTransactionNoAndCurrencyAndAmountAndTransactionDateAndSourceTypeAndReconStatus(
+    List<TransactionEntity> findByTransactionNoAndAndAmountAndTransactionDateAndSourceTypeAndReconStatus(
             String transactionNo,
-            String currency,
             Double amount,
             String transactionDate,
             SourceType sourceType,

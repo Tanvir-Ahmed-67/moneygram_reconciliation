@@ -25,6 +25,7 @@ public class FileUploadController {
             @RequestParam("payment_file") MultipartFile paymentFile,
             @RequestParam("settlement_file") MultipartFile settlementFile,
             Model model) {
+        System.out.println("Inside Controller");
 
         try {
             fileUploadService.processFiles(paymentFile, settlementFile);

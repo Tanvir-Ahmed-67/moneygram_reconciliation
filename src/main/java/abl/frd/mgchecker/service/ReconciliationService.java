@@ -36,15 +36,11 @@ public class ReconciliationService {
     public void reconcileIncremental() {
 
         // 1️⃣ Exact matches between new unprocessed PAYMENT and SETTLEMENT
-        List<Object[]> matches = txnRepo.findExactMatches(
-                SourceType.PAYMENT,
-                SourceType.SETTLEMENT,
-                ReconStatus.N
-        );
+        List<Object[]> matches = txnRepo.findExactMatches(SourceType.PAYMENT, SourceType.SETTLEMENT, ReconStatus.N);
 
         for (Object[] row : matches) {
-            String payId = (String) row[0];
-            String setId = (String) row[1];
+            String payId = String.valueOf(row[0]);
+            String setId = String.valueOf(row[1]);
             saveMatchAndUpdateStatus(payId, setId);
         }
 
@@ -59,9 +55,8 @@ public class ReconciliationService {
                     ? SourceType.SETTLEMENT
                     : SourceType.PAYMENT;
 
-            List<TransactionEntity> possibleMatches = txnRepo.findByTransactionNoAndCurrencyAndAmountAndTransactionDateAndSourceTypeAndReconStatus(
+            List<TransactionEntity> possibleMatches = txnRepo.findByTransactionNoAndAndAmountAndTransactionDateAndSourceTypeAndReconStatus(
                             txn.getTransactionNo(),
-                            txn.getCurrency(),
                             txn.getAmount(),
                             txn.getTransactionDate(),
                             otherType,
