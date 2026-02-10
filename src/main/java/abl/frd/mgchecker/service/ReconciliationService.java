@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ReconciliationService {
@@ -48,20 +49,20 @@ public class ReconciliationService {
         List<ReconciliationUnmatched> unmatchedList = unmatchRepo.findAll();
         for (ReconciliationUnmatched um : unmatchedList) {
 
-            TransactionEntity txn = txnRepo.findByTransactionNo(um.getTransactionNo());
+            //TransactionEntity txn = txnRepo.findByTransactionNo(um.getTransactionNo());
+            TransactionEntity txn = txnRepo.findByTransactionNoAndSourceType(um.getTransactionNo(), um.getSourceType()).orElse(null);
+
             if (txn == null) continue;
 
-            SourceType otherType = (txn.getSourceType() == SourceType.PAYMENT)
-                    ? SourceType.SETTLEMENT
-                    : SourceType.PAYMENT;
-
-            List<TransactionEntity> possibleMatches = txnRepo.findByTransactionNoAndAndAmountAndTransactionDateAndSourceTypeAndReconStatus(
-                            txn.getTransactionNo(),
-                            txn.getAmount(),
-                            txn.getTransactionDate(),
-                            otherType,
-                            ReconStatus.N
-                    );
+            List<TransactionEntity> possibleMatches =
+                    txnRepo.findByTransactionNoAndAmountAndTransactionDateAndReconStatus(
+                                    txn.getTransactionNo(),
+                                    txn.getAmount(),
+                                    txn.getTransactionDate(),
+                                    ReconStatus.N
+                            ).stream()
+                            .filter(t -> t.getSourceType() != txn.getSourceType())
+                            .collect(Collectors.toList());
 
             if (!possibleMatches.isEmpty()) {
                 TransactionEntity matchedTxn = possibleMatches.get(0);
@@ -71,18 +72,27 @@ public class ReconciliationService {
                 );
                 unmatchRepo.delete(um);
             }
+
         }
 
         // 3️⃣ Add remaining unprocessed transactions to unmatched
         List<TransactionEntity> stillUnmatched = txnRepo.findByReconStatus(ReconStatus.N);
         for (TransactionEntity txn : stillUnmatched) {
+            boolean alreadyExists = unmatchRepo.existsByTransactionNoAndSourceType(
+                    txn.getTransactionNo(),
+                    txn.getSourceType()
+            );
+
+            if (alreadyExists) {
+                continue; // do not insert duplicate
+            }
             ReconciliationUnmatched um = new ReconciliationUnmatched();
             um.setTransactionNo(txn.getTransactionNo());
             um.setSourceType(txn.getSourceType());
             um.setReason(UnmatchReason.NOT_FOUND);
             um.setDetectedOn(LocalDateTime.now());
-            unmatchRepo.save(um);
 
+            unmatchRepo.save(um);
             txn.setReconStatus(ReconStatus.U);
         }
     }

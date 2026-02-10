@@ -34,4 +34,14 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             ReconStatus reconStatus
     );
     TransactionEntity findByTransactionNo(String transactionNo);
+    Optional<TransactionEntity> findByTransactionNoAndSourceType(
+            String transactionNo,
+            SourceType sourceType
+    );
+    List<TransactionEntity> findByTransactionNoAndAmountAndTransactionDateAndReconStatus(
+            String transactionNo,
+            Double amount,
+            String transactionDate,
+            ReconStatus reconStatus
+    );
 }

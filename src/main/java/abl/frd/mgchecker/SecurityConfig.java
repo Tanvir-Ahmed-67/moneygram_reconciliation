@@ -1,11 +1,10 @@
 package abl.frd.mgchecker;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -13,15 +12,27 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-                .csrf().disable() // Keep this disabled for now so the upload works after login
+                .csrf().disable()
                 .authorizeRequests()
-                .antMatchers("/login", "/css/**", "/js/**").permitAll() // Allow login assets
-                .anyRequest().authenticated() // This forces login for "/" and "/upload"
+                // 1. Important: Permit access to your custom login page and static assets
+                .antMatchers("/login", "/css/**", "/js/**").permitAll()
+                .anyRequest().authenticated()
                 .and()
                 .formLogin()
-                .defaultSuccessUrl("/", true) // Go to upload page after login
+                // 2. Point to your @GetMapping("/login")
+                .loginPage("/login")
+                // 3. This is the POST URL that Spring Security handles automatically
+                .loginProcessingUrl("/login")
+                .defaultSuccessUrl("/", true)
+                .failureUrl("/login?error=true") // Redirect here on wrong credentials
                 .permitAll()
                 .and()
-                .logout().permitAll();
+                .logout()
+                // 4. Match the path used in your logout button
+                .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
+                .logoutSuccessUrl("/login?logout")
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
+                .permitAll();
     }
 }

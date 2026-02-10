@@ -10,7 +10,13 @@ import java.time.LocalDateTime;
 @Table(
         name = "reconciliation_unmatched",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"transaction_no"})
+                @UniqueConstraint(columnNames = {"transaction_no", "source_type"})
+        },
+        indexes = {
+                @Index(
+                        name = "idx_unmatched_txn_source",
+                        columnList = "transaction_no, source_type"
+                )
         }
 )
 public class ReconciliationUnmatched {
@@ -21,11 +27,11 @@ public class ReconciliationUnmatched {
     @Column(name = "transaction_no", length=30, nullable = false)
     private String transactionNo;
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "source_type",nullable = false)
     private SourceType sourceType;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "reason",nullable = false)
     private UnmatchReason reason;
 
     @Column(nullable = false)

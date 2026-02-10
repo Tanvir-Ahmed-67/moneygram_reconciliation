@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reconciliation Results</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="#">Moneygram Reconciliation System</a>
+
+    <form th:action="@{/logout}" method="post">
+      <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </button>
+    </form>
+  </div>
+</nav>
+<div class="container py-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-secondary">Reconciliation Report</h2>
+    <a th:href="@{/}" class="btn btn-outline-secondary btn-sm rounded-pill">
+      <i class="bi bi-arrow-left"></i> Upload New Files
+    </a>
+  </div>
+
+  <ul class="nav nav-pills mb-4 justify-content-center" id="reconTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active px-4 rounded-pill" id="summary-tab" data-bs-toggle="pill" data-bs-target="#summary" type="button" role="tab">
+        Unreconciled by Date
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link px-4 rounded-pill" id="detail-tab" data-bs-toggle="pill" data-bs-target="#detail" type="button" role="tab">
+        All Unreconciled Data
+      </button>
+    </li>
+  </ul>
+  <div class="d-flex justify-content-end gap-2 mb-3">
+    <span class="align-self-center me-2 text-muted small">Export Unreconciled:</span>
+    <a th:href="@{/download/csv}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-filetype-csv"></i> Download CSV
+    </a>
+    <a th:href="@{/download/excel}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-file-earmark-excel"></i> Download Excel
+    </a>
+  </div>
+
+  <div class="tab-content" id="reconTabContent">
+
+    <div class="tab-pane fade show active" id="summary" role="tabpanel">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+            <tr>
+              <th class="ps-4">Serial</th>
+              <th class="ps-4">Transaction Date</th>
+              <th class="ps-4">Transaction No</th>
+              <th>Legacy Id</th>
+              <th class="text-end pe-4">Amount</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${unreconciledByDate}">
+              <td th:text="${item.serial}">1</td>
+              <td class="ps-4" th:text="${item.date}">2023-10-01</td>
+              <td class="ps-4" th:text="${item.transactionNo}">624122</td>
+              <td class="ps-4" th:text="${item.legacyId}">1234</td>
+              <td class="text-end pe-4 fw-bold text-danger" th:text="${item.totalAmount}">$1,250.00</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="detail" role="tabpanel">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+              <tr>
+                <th class="ps-4">Serial</th>
+                <th>Transaction Date</th>
+                <th>Transaction No</th>
+                <th>Legacy Id</th>
+                <th class="text-end pe-4">Amount</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="row : ${allUnreconciled}">
+                <td class="ps-4 text-muted" th:text="${row.serial}">1</td>
+                <td th:text="${row.date}">2023-10-01</td>
+                <td th:text="${row.transactionNo}">Payment Ref: ABC</td>
+                <td th:text="${row.LegacyId}">Payment File</td>
+                <td class="text-end pe-4 fw-bold" th:text="${row.amount}">$250.00</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
