@@ -12,15 +12,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +38,6 @@ public class FileUploadService {
 
     @Transactional
     public void processFiles(MultipartFile paymentFile, MultipartFile settlementFile) throws Exception {
-        System.out.println(".........Inside Process File");
         InputStream payment = paymentFile.getInputStream();
         Workbook recordsPayments = getWorkbook(payment);
         Sheet worksheetPayment = recordsPayments.getSheetAt(0);
@@ -55,7 +51,6 @@ public class FileUploadService {
 
         // 2️⃣ Parse Settlement file
         parseAndSaveSettlementFile(worksheetSettlement, SourceType.SETTLEMENT);
-        System.out.println(".........After method parseAndSaveSettlementFile File");
 
         // 3️⃣ Run reconciliation including unmatched re-check
         reconciliationService.reconcileIncremental();
@@ -85,7 +80,7 @@ public class FileUploadService {
             txn.setAmount(amount);
             txn.setLegacyId(legacyId);
             txn.setTransactionDate(String.valueOf(paidDate));
-            txn.setFileUploadDate(String.valueOf(LocalDateTime.now()));
+            txn.setFileUploadDate(LocalDate.now().toString());
             txn.setSourceType(sourceType);
             txn.setReconStatus(ReconStatus.N);
             batch.add(txn);
@@ -122,11 +117,10 @@ public class FileUploadService {
                 LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
                 TransactionEntity txn = new TransactionEntity();
                 txn.setTransactionNo(transactionNo);
-                System.out.println(transactionNo + "........." + amount);
                 txn.setAmount(amount);
                 txn.setLegacyId(legacyId);
                 txn.setTransactionDate(String.valueOf(paidDate));
-                txn.setFileUploadDate(String.valueOf(LocalDateTime.now()));
+                txn.setFileUploadDate(LocalDate.now().toString());
                 txn.setSourceType(sourceType);
                 txn.setReconStatus(ReconStatus.N);
                 batch.add(txn);
@@ -204,8 +198,6 @@ public class FileUploadService {
         for (ReconciliationUnmatched row : rows) {
             Row excelRow = sheet.createRow(rowIdx++);
             excelRow.createCell(0).setCellValue(row.getId());
-            //excelRow.createCell(1).setCellValue(row.getDate().toString());
-           // excelRow.createCell(2).setCellValue(row.getAmount().doubleValue());
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();

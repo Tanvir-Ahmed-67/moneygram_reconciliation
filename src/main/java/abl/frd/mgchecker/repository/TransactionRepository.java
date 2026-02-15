@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -44,4 +45,8 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             String transactionDate,
             ReconStatus reconStatus
     );
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM TransactionEntity t JOIN ReconciliationUnmatched u ON t.transactionNo = u.transactionNo AND t.sourceType = u.sourceType ")
+    BigDecimal sumAllUnmatchedAmount();
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM TransactionEntity t JOIN ReconciliationUnmatched u ON t.transactionNo = u.transactionNo AND t.sourceType = u.sourceType WHERE t.fileUploadDate = :today")
+    BigDecimal sumTodayUnmatchedAmount(@Param("today") String today);
 }
