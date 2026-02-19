@@ -1,7 +1,7 @@
 package abl.frd.mgchecker.enumpack;
 
 public enum ReconStatus {
-    N,   // Not processed
+    S,   // Staged
     M,   // Matched
     U,   // Unmatched
 }

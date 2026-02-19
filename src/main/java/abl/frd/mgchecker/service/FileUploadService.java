@@ -1,10 +1,14 @@
 package abl.frd.mgchecker.service;
 
+import abl.frd.mgchecker.enumpack.FileStatus;
 import abl.frd.mgchecker.enumpack.ReconStatus;
 import abl.frd.mgchecker.enumpack.SourceType;
+import abl.frd.mgchecker.helper.FileSummary;
 import abl.frd.mgchecker.model.ReconciliationUnmatched;
 import abl.frd.mgchecker.model.TransactionEntity;
+import abl.frd.mgchecker.model.UploadedFileEntity;
 import abl.frd.mgchecker.repository.TransactionRepository;
+import abl.frd.mgchecker.repository.UploadedFileRepository;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -18,51 +22,51 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class FileUploadService {
 
     private final TransactionRepository txnRepo;
+    private final UploadedFileRepository uploadedFileRepository;
     private final ReconciliationService reconciliationService;
 
-    public FileUploadService(TransactionRepository txnRepo,
-                             ReconciliationService reconciliationService) {
+    public FileUploadService(TransactionRepository txnRepo, ReconciliationService reconciliationService, UploadedFileRepository uploadedFileRepository) {
         this.txnRepo = txnRepo;
         this.reconciliationService = reconciliationService;
+        this.uploadedFileRepository = uploadedFileRepository;
     }
 
     @Transactional
-    public void processFiles(MultipartFile paymentFile, MultipartFile settlementFile) throws Exception {
-        InputStream payment = paymentFile.getInputStream();
-        Workbook recordsPayments = getWorkbook(payment);
-        Sheet worksheetPayment = recordsPayments.getSheetAt(0);
+    public void processFiles(List<MultipartFile> paymentFiles, List<MultipartFile> settlementFiles) throws Exception {
+        // 1️⃣ Process Payment Files
+        if (paymentFiles != null) {
+            for (MultipartFile file : paymentFiles) {
+                if (file.isEmpty()) continue;
+                saveSinglePaymentFile(file, SourceType.PAYMENT);
+            }
+        }
 
-        InputStream settlement = settlementFile.getInputStream();
-        Workbook recordsSettlement = getWorkbook(settlement);
-        Sheet worksheetSettlement = recordsSettlement.getSheetAt(0);
-
-        // 1️⃣ Parse Payment file
-        parseAndSavePaymentFile(worksheetPayment, SourceType.PAYMENT);
-
-        // 2️⃣ Parse Settlement file
-        parseAndSaveSettlementFile(worksheetSettlement, SourceType.SETTLEMENT);
-
-        // 3️⃣ Run reconciliation including unmatched re-check
-        reconciliationService.reconcileIncremental();
+        // 2️⃣ Process Settlement Files
+        if (settlementFiles != null) {
+            for (MultipartFile file : settlementFiles) {
+                if (file.isEmpty()) continue;
+                saveSingleSettlementFile(file, SourceType.SETTLEMENT);
+            }
+        }
     }
 
-    private void parseAndSavePaymentFile(Sheet worksheet, SourceType sourceType) throws Exception {
-        Map<String, Object> resp = new HashMap<>();
+    private FileSummary parseAndSavePaymentFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile) throws Exception {
         Row row;
-        List<Map<String, Object>> dataList = new ArrayList<>();
         List<TransactionEntity> batch = new ArrayList<>();
-        List<String[]> uniqueKeys = new ArrayList<>();
         String legacyId= "";
+        BigDecimal amount;
+        int totalCount = 0;
+        BigDecimal totalAmount = BigDecimal.ZERO;
         for (int rowIndex = 6; rowIndex <= worksheet.getLastRowNum(); rowIndex++){
             row = worksheet.getRow(rowIndex);
             if(row == null) continue;
@@ -71,19 +75,27 @@ public class FileUploadService {
             if(cellB.trim().isEmpty() && cellC.trim().isEmpty()) continue;
             if(cellC.contains("Legacy ID :")) legacyId = getCellValueAsString(row.getCell(6)).trim();
             if(cellB.contains("Account Number :") || cellB.isEmpty() || cellB.contains("Settlement Currency :")) continue;
-            Double amount = Double.valueOf(getCellValueAsString(row.getCell(25)).trim().replace("-", ""));
-            if(amount==0.0) continue;
-            String transactionNo = getCellValueAsString(row.getCell(8)).trim();
+            String cellValueAmount = getCellValueAsString(row.getCell(25)).trim().replace("-", "");
+            amount = (cellValueAmount.isEmpty()) ? BigDecimal.ZERO : new BigDecimal(cellValueAmount);
+            if(amount.compareTo(BigDecimal.ZERO) == 0) continue;
+            String transactionNo = getCellValueAsString(row.getCell(4)).trim();
+            String referenceNo = getCellValueAsString(row.getCell(8)).trim();
+            String originatingCountry = getCellValueAsString(row.getCell(14)).trim();
             LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
             TransactionEntity txn = new TransactionEntity();
             txn.setTransactionNo(transactionNo);
+            txn.setReferenceNo(referenceNo);
+            txn.setOriginatingCountry(originatingCountry);
             txn.setAmount(amount);
             txn.setLegacyId(legacyId);
             txn.setTransactionDate(String.valueOf(paidDate));
-            txn.setFileUploadDate(LocalDate.now().toString());
+            txn.setFileUploadDate(uploadedFile.getUploadTime());
             txn.setSourceType(sourceType);
-            txn.setReconStatus(ReconStatus.N);
+            txn.setReconStatus(ReconStatus.S);
+            txn.setUploadedFile(uploadedFile);
             batch.add(txn);
+            totalCount++;
+            totalAmount = totalAmount.add(amount);
             if (batch.size() >= 500) {
                 txnRepo.saveAll(batch);
                 batch.clear();
@@ -92,15 +104,15 @@ public class FileUploadService {
         if (!batch.isEmpty()) {
             txnRepo.saveAll(batch);
         }
+        return new FileSummary(totalCount, totalAmount);
     }
-    private void parseAndSaveSettlementFile(Sheet worksheet, SourceType sourceType) throws Exception {
-        Map<String, Object> resp = new HashMap<>();
+    private FileSummary parseAndSaveSettlementFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile) throws Exception {
         Row row;
-        List<Map<String, Object>> dataList = new ArrayList<>();
         List<TransactionEntity> batch = new ArrayList<>();
-        List<String[]> uniqueKeys = new ArrayList<>();
         String legacyId= "";
-        Double amount=0.0;
+        BigDecimal amount;
+        int totalCount = 0;
+        BigDecimal totalAmount = BigDecimal.ZERO;
         for (int rowIndex = 8; rowIndex <= worksheet.getLastRowNum(); rowIndex++){
             row = worksheet.getRow(rowIndex);
             if(row == null) continue;
@@ -109,21 +121,28 @@ public class FileUploadService {
             String cellW = getCellValueAsString(row.getCell(22)).trim();
             if (cellC.contains("Legacy ID :")) legacyId = getCellValueAsString(row.getCell(8)).trim();
             if(cellB.trim().isEmpty() && cellC.trim().isEmpty()) continue;
-            //if(cellB.contains("Account Number :") || cellB.isEmpty() || cellB.contains("Settlement Currency :")) continue;
             if(cellW.equals("trn")) {
-                amount = Double.valueOf(getCellValueAsString(row.getCell(23)).trim().replace("-", ""));
-                if (amount == 0.0) continue;
-                String transactionNo = getCellValueAsString(row.getCell(7)).trim();
+                String cellValueAmount = getCellValueAsString(row.getCell(23)).trim().replace("-", "");
+                amount = (cellValueAmount.isEmpty()) ? BigDecimal.ZERO : new BigDecimal(cellValueAmount);
+                if (amount.compareTo(BigDecimal.ZERO) == 0) continue;
+                String referenceNo = getCellValueAsString(row.getCell(7)).trim();
+                String transactionNo = getCellValueAsString(row.getCell(3)).trim();
+                String originatingCountry = getCellValueAsString(row.getCell(11)).trim();
                 LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
                 TransactionEntity txn = new TransactionEntity();
                 txn.setTransactionNo(transactionNo);
+                txn.setReferenceNo(referenceNo);
+                txn.setOriginatingCountry(originatingCountry);
                 txn.setAmount(amount);
                 txn.setLegacyId(legacyId);
                 txn.setTransactionDate(String.valueOf(paidDate));
-                txn.setFileUploadDate(LocalDate.now().toString());
+                txn.setFileUploadDate(uploadedFile.getUploadTime());
                 txn.setSourceType(sourceType);
-                txn.setReconStatus(ReconStatus.N);
+                txn.setReconStatus(ReconStatus.S);
+                txn.setUploadedFile(uploadedFile);
                 batch.add(txn);
+                totalCount++;
+                totalAmount = totalAmount.add(amount);
             }
             if (batch.size() >= 500) {
                 txnRepo.saveAll(batch);
@@ -131,9 +150,9 @@ public class FileUploadService {
             }
         }
         if (!batch.isEmpty()) {
-
             txnRepo.saveAll(batch);
         }
+        return new FileSummary(totalCount, totalAmount);
     }
 
     public static Workbook getWorkbook(InputStream is) throws IOException {
@@ -172,38 +191,86 @@ public class FileUploadService {
             return null;
         }
     }
-    public byte[] generateCsv(List<ReconciliationUnmatched> rows) {
-        StringBuilder csv = new StringBuilder();
-        csv.append("Serial,Transaction Date,Transaction No,Legacy Id,Amount\n"); // Header
-        for (ReconciliationUnmatched row : rows) {
-            csv.append(String.format("%s,%s,%s,%s,%s\n",
-                    row.getId(), "", "", "", 1000));
+    private void saveSinglePaymentFile(MultipartFile file, SourceType sourceType) throws Exception {
+        // 1️⃣ Check if file already exists in STAGED or PROCESSED
+        Optional<UploadedFileEntity> existingFile = uploadedFileRepository
+                .findByFileNameAndSourceType(file.getOriginalFilename(), sourceType);
+
+        if (existingFile.isPresent()) {
+            throw new RuntimeException("File '" + file.getOriginalFilename() + "' already uploaded for " + sourceType);
         }
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        // 1️⃣ Save file metadata
+        UploadedFileEntity uploadedFile = new UploadedFileEntity();
+        uploadedFile.setFileName(file.getOriginalFilename());
+        uploadedFile.setSourceType(sourceType);
+        uploadedFile.setUploadTime(LocalDateTime.now());
+        uploadedFile.setStatus(FileStatus.STAGED);
+
+        uploadedFile = uploadedFileRepository.save(uploadedFile);
+
+        // 2️⃣ Parse and save transactions
+        InputStream payment = file.getInputStream();
+        Workbook recordsPayments = getWorkbook(payment);
+        Sheet worksheetPayment = recordsPayments.getSheetAt(0);
+        String paymentFileName = file.getOriginalFilename();
+        //  get summary from parser
+        FileSummary summary = parseAndSavePaymentFile(worksheetPayment, sourceType, uploadedFile);
+        //  update file totals
+        uploadedFile.setTotalTransactions(summary.getTotalCount());
+        uploadedFile.setTotalAmount(summary.getTotalAmount());
+        uploadedFileRepository.save(uploadedFile);
     }
-    public byte[] generateExcel(List<ReconciliationUnmatched> rows) throws IOException {
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Unreconciled");
+    private void saveSingleSettlementFile(MultipartFile file, SourceType sourceType) throws Exception {
+        // 1️⃣ Check if file already exists in STAGED or PROCESSED
+        Optional<UploadedFileEntity> existingFile = uploadedFileRepository
+                .findByFileNameAndSourceType(file.getOriginalFilename(), sourceType);
 
-        // Create header row
-        Row header = sheet.createRow(0);
-        header.createCell(0).setCellValue("Serial");
-        header.createCell(1).setCellValue("Transaction Date");
-        header.createCell(2).setCellValue("Transaction No");
-        header.createCell(2).setCellValue("Legacy Id");
-        header.createCell(2).setCellValue("Amount");
-
-        // Fill data
-        int rowIdx = 1;
-        for (ReconciliationUnmatched row : rows) {
-            Row excelRow = sheet.createRow(rowIdx++);
-            excelRow.createCell(0).setCellValue(row.getId());
+        if (existingFile.isPresent()) {
+            throw new RuntimeException("File '" + file.getOriginalFilename() + "' already uploaded for " + sourceType);
         }
+        // 1️⃣ Save file metadata
+        UploadedFileEntity uploadedFile = new UploadedFileEntity();
+        uploadedFile.setFileName(file.getOriginalFilename());
+        uploadedFile.setSourceType(sourceType);
+        uploadedFile.setUploadTime(LocalDateTime.now());
+        uploadedFile.setStatus(FileStatus.STAGED);
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        workbook.write(out);
-        workbook.close();
-        return out.toByteArray();
+        uploadedFile = uploadedFileRepository.save(uploadedFile);
+
+        // 2️⃣ Parse and save transactions
+        InputStream settlement = file.getInputStream();
+        Workbook recordsSettlement = getWorkbook(settlement);
+        Sheet worksheetSettlement = recordsSettlement.getSheetAt(0);
+        String settlementFileName = file.getOriginalFilename();
+        //  get summary from parser
+        FileSummary summary = parseAndSaveSettlementFile(worksheetSettlement, sourceType, uploadedFile);
+        //  update file totals
+        uploadedFile.setTotalTransactions(summary.getTotalCount());
+        uploadedFile.setTotalAmount(summary.getTotalAmount());
+        uploadedFileRepository.save(uploadedFile);
+    }
+    public void deleteMultipleFiles(List<Integer> fileIds) {
+        // Fetch the entities first so Hibernate can manage the cascade deletion
+        List<UploadedFileEntity> filesToDelete = uploadedFileRepository.findAllById(fileIds);
+
+        if (!filesToDelete.isEmpty()) {
+            // This triggers the orphanRemoval and CascadeType.ALL logic
+            uploadedFileRepository.deleteAll(filesToDelete);
+        }
     }
 
+    @Transactional
+    public void deleteUploadedFile(Integer uploadedFileId) {
+        UploadedFileEntity file = uploadedFileRepository.findById(uploadedFileId)
+                .orElseThrow(() -> new RuntimeException("File not found"));
+
+        // Delete only staged transactions, not reconciled or unmatched
+        txnRepo.deleteByUploadedFileAndReconStatus(file, ReconStatus.S);
+
+        // Delete the file record
+        uploadedFileRepository.delete(file);
+    }
+    public List<UploadedFileEntity> findByStatus(FileStatus fileStatus){
+        return uploadedFileRepository.findByStatus(fileStatus);
+    }
 }

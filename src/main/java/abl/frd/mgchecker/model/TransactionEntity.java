@@ -4,6 +4,8 @@ import abl.frd.mgchecker.enumpack.ReconStatus;
 import abl.frd.mgchecker.enumpack.SourceType;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -21,12 +23,19 @@ public class TransactionEntity {
     private int  id;
     @Column(name = "transaction_no", length=30, nullable = false)
     private String transactionNo;
-    @Column(name = "amount", length = 15, nullable = false)
-    private Double amount;
+
+    @Column(name = "reference_no", length=30, nullable = false)
+    private String referenceNo;
+    @Column(name = "org_country", length=30, nullable = false)
+    private String originatingCountry;
+
+    @Column(name = "amount", precision = 18, scale = 2, nullable = false)
+    private BigDecimal amount;
     @Column(name = "transaction_date", length=30)
     private String transactionDate;
+
     @Column(name = "file_upload_date", length=30)
-    private String fileUploadDate;
+    private LocalDateTime fileUploadDate;
 
     @Column(name = "legacy_id", length=30)
     private String legacyId;
@@ -36,7 +45,11 @@ public class TransactionEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ReconStatus reconStatus = ReconStatus.N;
+    private ReconStatus reconStatus = ReconStatus.S;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "file_id", nullable = false)
+    private UploadedFileEntity uploadedFile;
 
     public int getId() {
         return id;
@@ -54,11 +67,11 @@ public class TransactionEntity {
         this.transactionNo = transactionNo;
     }
 
-    public Double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(Double amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 
@@ -68,14 +81,6 @@ public class TransactionEntity {
 
     public void setTransactionDate(String transactionDate) {
         this.transactionDate = transactionDate;
-    }
-
-    public String getFileUploadDate() {
-        return fileUploadDate;
-    }
-
-    public void setFileUploadDate(String fileUploadDate) {
-        this.fileUploadDate = fileUploadDate;
     }
 
     public SourceType getSourceType() {
@@ -100,5 +105,37 @@ public class TransactionEntity {
 
     public void setLegacyId(String legacyId) {
         this.legacyId = legacyId;
+    }
+
+    public LocalDateTime getFileUploadDate() {
+        return fileUploadDate;
+    }
+
+    public void setFileUploadDate(LocalDateTime fileUploadDate) {
+        this.fileUploadDate = fileUploadDate;
+    }
+
+    public String getReferenceNo() {
+        return referenceNo;
+    }
+
+    public void setReferenceNo(String referenceNo) {
+        this.referenceNo = referenceNo;
+    }
+
+    public String getOriginatingCountry() {
+        return originatingCountry;
+    }
+
+    public void setOriginatingCountry(String originatingCountry) {
+        this.originatingCountry = originatingCountry;
+    }
+
+    public UploadedFileEntity getUploadedFile() {
+        return uploadedFile;
+    }
+
+    public void setUploadedFile(UploadedFileEntity uploadedFileEntity) {
+        this.uploadedFile = uploadedFileEntity;
     }
 }

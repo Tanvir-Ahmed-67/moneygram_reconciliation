@@ -26,6 +26,9 @@ public class ReconciliationUnmatched {
     private int  id;
     @Column(name = "transaction_no", length=30, nullable = false)
     private String transactionNo;
+
+    @Column(name = "reference_no", length=30, nullable = false)
+    private String referenceNo;
     @Enumerated(EnumType.STRING)
     @Column(name = "source_type",nullable = false)
     private SourceType sourceType;
@@ -75,5 +78,13 @@ public class ReconciliationUnmatched {
 
     public void setDetectedOn(LocalDateTime detectedOn) {
         this.detectedOn = detectedOn;
+    }
+
+    public String getReferenceNo() {
+        return referenceNo;
+    }
+
+    public void setReferenceNo(String referenceNo) {
+        this.referenceNo = referenceNo;
     }
 }
