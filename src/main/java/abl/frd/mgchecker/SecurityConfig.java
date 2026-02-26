@@ -42,8 +42,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Bean
     public org.springframework.security.core.userdetails.UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
         UserDetails user = org.springframework.security.core.userdetails.User.withUsername("admin")
-                .password(passwordEncoder.encode("M@g#123"))  // encode password
-                .roles("Admin")
+                .password(passwordEncoder.encode("123"))  // encode password
+                .roles("admin")
                 .build();
         return new org.springframework.security.provisioning.InMemoryUserDetailsManager(user);
     }

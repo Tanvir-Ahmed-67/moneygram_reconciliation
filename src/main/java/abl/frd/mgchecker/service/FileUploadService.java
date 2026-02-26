@@ -24,9 +24,7 @@ import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class FileUploadService {
@@ -67,6 +65,7 @@ public class FileUploadService {
         BigDecimal amount;
         int totalCount = 0;
         BigDecimal totalAmount = BigDecimal.ZERO;
+        Set<String> seenTransactions = new HashSet<>();
         for (int rowIndex = 6; rowIndex <= worksheet.getLastRowNum(); rowIndex++){
             row = worksheet.getRow(rowIndex);
             if(row == null) continue;
@@ -82,6 +81,31 @@ public class FileUploadService {
             String referenceNo = getCellValueAsString(row.getCell(8)).trim();
             String originatingCountry = getCellValueAsString(row.getCell(14)).trim();
             LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
+            // ================================Finding Duplicate ======================
+            // Normalize values for finding duplication in same file
+            String normalizedAmount = amount.stripTrailingZeros().toPlainString();
+            String normalizedDate   = String.valueOf(paidDate).trim();
+            // Build composite key
+            String compositeKey = String.join("|",
+                    transactionNo.trim(),
+                    referenceNo.trim(),
+                    normalizedAmount,
+                    legacyId.trim(),
+                    normalizedDate,
+                    sourceType.name()
+            );
+            // 1️⃣ Duplicate inside SAME FILE
+            if (seenTransactions.contains(compositeKey)) {
+                continue; // skip duplicate row in same file
+            }
+            seenTransactions.add(compositeKey);
+            // Duplicate inside database BEFORE saving
+            boolean exists = txnRepo
+                    .existsByTransactionNoAndReferenceNoAndAmountAndLegacyIdAndTransactionDateAndSourceType(transactionNo,referenceNo,amount,legacyId,String.valueOf(paidDate),sourceType);
+            if (exists) {
+                continue; // skip duplicate
+            }
+            // ================================End of Duplicate Finding Block ======================
             TransactionEntity txn = new TransactionEntity();
             txn.setTransactionNo(transactionNo);
             txn.setReferenceNo(referenceNo);
@@ -113,6 +137,7 @@ public class FileUploadService {
         BigDecimal amount;
         int totalCount = 0;
         BigDecimal totalAmount = BigDecimal.ZERO;
+        Set<String> seenTransactions = new HashSet<>();
         for (int rowIndex = 8; rowIndex <= worksheet.getLastRowNum(); rowIndex++){
             row = worksheet.getRow(rowIndex);
             if(row == null) continue;
@@ -129,6 +154,31 @@ public class FileUploadService {
                 String transactionNo = getCellValueAsString(row.getCell(3)).trim();
                 String originatingCountry = getCellValueAsString(row.getCell(11)).trim();
                 LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
+                // ================================Finding Duplicate ======================
+                // Normalize values for finding duplication in same file
+                String normalizedAmount = amount.stripTrailingZeros().toPlainString();
+                String normalizedDate   = String.valueOf(paidDate).trim();
+                // Build composite key
+                String compositeKey = String.join("|",
+                        transactionNo.trim(),
+                        referenceNo.trim(),
+                        normalizedAmount,
+                        legacyId.trim(),
+                        normalizedDate,
+                        sourceType.name()
+                );
+                // 1️⃣ Duplicate inside SAME FILE
+                if (seenTransactions.contains(compositeKey)) {
+                    continue; // skip duplicate in same file
+                }
+                seenTransactions.add(compositeKey);
+                // Duplicate inside database BEFORE saving
+                boolean exists = txnRepo
+                        .existsByTransactionNoAndReferenceNoAndAmountAndLegacyIdAndTransactionDateAndSourceType(transactionNo,referenceNo,amount,legacyId,String.valueOf(paidDate),sourceType);
+                if (exists) {
+                    continue; // skip duplicate in already in database
+                }
+                // ================================End of Duplicate Finding Block ======================
                 TransactionEntity txn = new TransactionEntity();
                 txn.setTransactionNo(transactionNo);
                 txn.setReferenceNo(referenceNo);
@@ -272,5 +322,11 @@ public class FileUploadService {
     }
     public List<UploadedFileEntity> findByStatus(FileStatus fileStatus){
         return uploadedFileRepository.findByStatus(fileStatus);
+    }
+    public UploadedFileEntity findById(int id){
+        return uploadedFileRepository.findById(id);
+    }
+    public List<UploadedFileEntity> findAll(){
+        return uploadedFileRepository.findAll();
     }
 }

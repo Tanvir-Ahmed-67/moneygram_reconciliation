@@ -55,4 +55,6 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     void deleteByUploadedFile(UploadedFileEntity uploadedFileEntity);
     List<TransactionEntity> findByUploadedFile(UploadedFileEntity uploadedFileEntity);
     void deleteByUploadedFileAndReconStatus(UploadedFileEntity file, ReconStatus status);
+    boolean existsByTransactionNoAndReferenceNoAndAmountAndLegacyIdAndTransactionDateAndSourceType(String transactionNo,String referenceNo,BigDecimal amount,String legacyId,String paidDate,SourceType sourceType);
+    List<TransactionEntity> findByReconStatusIn(List<ReconStatus> statuses);
 }

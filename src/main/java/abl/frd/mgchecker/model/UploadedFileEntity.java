@@ -100,4 +100,13 @@ public class UploadedFileEntity {
     public void setTransactions(List<TransactionEntity> transactions) {
         this.transactions = transactions;
     }
+    public String getProcessingStatus() {
+        if (transactions == null || transactions.isEmpty()) return "EMPTY";
+
+        long pending = transactions.stream()
+                .filter(t -> t.getReconStatus().equals("S"))
+                .count();
+
+        return pending == 0 ? "COMPLETED" : "PENDING";
+    }
 }

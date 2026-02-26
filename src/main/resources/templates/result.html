@@ -9,8 +9,14 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f4f7f9; color: #334155; }
         .navbar { background-color: #0d2137 !important; padding: 0.75rem 2rem; }
-        .navbar-brand { font-weight: 700; letter-spacing: -0.5px; }
-        .page-title { color: #0d2137; font-weight: 700; margin-bottom: 0.25rem; }
+        /* Compact Search Box in Navbar */
+        .search-box {
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.8rem;
+            width: 280px;
+            transition: all 0.2s;
+        }
 
         /* Card & Table */
         .card { border: none; border-radius: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.04); overflow: hidden; }
@@ -35,43 +41,62 @@
 
         .amount-val { font-family: 'Inter', sans-serif; font-weight: 700; color: #0f172a; }
         .btn-export { font-weight: 600; border-radius: 0.75rem; }
+        .btn-signout { font-size: 0.8rem; font-weight: 600; }
+
+        /* Compact Date Filter */
+        .date-filter-box { background: #ffffff; border-radius: 0.75rem; padding: 12px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
     </style>
 </head>
 <body>
-
 <nav class="navbar navbar-dark shadow-sm">
     <div class="container-fluid">
-        <a class="navbar-brand fw-bold brand-text" href="#">Foreign Remittance Division <span class="fw-light">Reconciliation System</span></a>
-        <form th:action="@{/logout}" method="post" class="m-0">
-            <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3 fw-medium">Logout</button>
-        </form>
+        <a class="navbar-brand" href="#">FRD <span class="fw-light">Reconciliation</span></a>
+        <div class="d-flex align-items-center gap-3">
+            <input type="text" id="summarySearch" class="form-control form-control-sm search-box" placeholder="Quick search date (e.g. 2024-05-20)...">
+            <a th:href="@{/summary}" class="btn btn-outline-light btn-sm px-3">Summary View</a>
+            <a th:href="@{/}" class="btn btn-outline-light btn-sm px-3">New Upload</a>
+            <form th:action="@{/logout}" method="post" class="m-0">
+                <button type="submit" class="btn btn-danger btn-sm px-3">Sign Out</button>
+            </form>
+        </div>
     </div>
 </nav>
 
 <div class="container-fluid px-lg-5 py-4">
-    <!-- Page Title & Buttons -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-2 gap-3">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-3">
         <div>
             <h3 class="page-title">Unreconciled Records</h3>
             <p class="text-muted small mb-0">
                 Discrepancy report based on the latest automated matching.<br/>
-                <strong>Data up to: </strong><span th:text="${upToDate}">N/A</span>
+                <strong>Data for: </strong><span class="text-primary fw-bold" th:text="${upToDate}">N/A</span>
             </p>
         </div>
         <div class="d-flex gap-2">
+            <a th:if="${isFiltered}" th:href="@{/result}" class="btn btn-primary btn-sm btn-export px-3">View All Unreconciled</a>
             <button id="exportExcel" class="btn btn-success btn-sm btn-export px-3">Download Excel</button>
-            <a th:href="@{/}" class="btn btn-outline-secondary btn-sm btn-export px-3">New Upload</a>
         </div>
     </div>
 
-    <!-- Search Box -->
-    <div class="d-flex align-items-center justify-content-end mb-3">
-        <div style="width: 250px;">
-            <input type="text" id="tableSearch" class="form-control form-control-sm" placeholder="Search transactions...">
-        </div>
+    <div class="date-filter-box mb-4">
+        <form th:action="@{/result}" method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;">START DATE</label>
+                <input type="date" name="startDate" th:value="${startDate}" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;">END DATE</label>
+                <input type="date" name="endDate" th:value="${endDate}" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Apply Filter</button>
+            </div>
+            <div class="col-md-4 ms-auto">
+                <label class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;">SEARCH</label>
+                <input type="text" id="tableSearch" class="form-control form-control-sm">
+            </div>
+        </form>
     </div>
 
-    <!-- Unreconciled Table -->
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
             <table id="allTable" class="table table-hover align-middle">
@@ -100,20 +125,21 @@
                               class="badge-custom"></span>
                     </td>
                     <td th:text="${txn.referenceNo}"></td>
-                    <td class="text-end" th:text="${#numbers.formatDecimal(txn.amount,1,'COMMA',2,'POINT')}"></td>
+                    <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(txn.amount,1,'COMMA',2,'POINT')}"></td>
                 </tr>
                 <tr th:if="${#lists.isEmpty(allData)}">
                     <td colspan="8" class="text-center py-5 text-muted">
                         <div class="py-3">
-                            <p class="mb-0">All clear! No unreconciled records found.</p>
+                            <p class="mb-0 fw-bold">No unreconciled records found for this selection.</p>
+                            <a th:href="@{/result}" class="small text-decoration-none">View all unreconciled</a>
                         </div>
                     </td>
                 </tr>
                 </tbody>
                 <tfoot class="table-light">
                 <tr class="fw-bold">
-                    <td colspan="7" class="text-end">Total :</td>
-                    <td class="text-end pe-4" th:text="${#numbers.formatDecimal(allTotal,1,'COMMA',2,'POINT')}"></td>
+                    <td colspan="7" class="text-end py-3">Grand Total :</td>
+                    <td class="text-end pe-4 py-3 text-primary" th:text="${#numbers.formatDecimal(allTotal,1,'COMMA',2,'POINT')}"></td>
                 </tr>
                 </tfoot>
             </table>
@@ -125,24 +151,22 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
-    // --- Excel Export ---
-    function exportTableToExcel(tableId, filename = 'export.xlsx') {
+    function exportTableToExcel(tableId, filename = 'Unreconciled_Report.xlsx') {
         const table = document.getElementById(tableId);
         const wb = XLSX.utils.table_to_book(table, { sheet: "Unreconciled" });
         XLSX.writeFile(wb, filename);
     }
 
     document.getElementById('exportExcel').addEventListener('click', function() {
-        exportTableToExcel('allTable', 'unreconciled.xlsx');
+        exportTableToExcel('allTable');
     });
 
-    // --- Search Logic ---
     document.getElementById('tableSearch').addEventListener('keyup', function() {
         const filter = this.value.toLowerCase();
         const rows = Array.from(document.querySelectorAll('#allTable tbody tr'));
         rows.forEach(row => {
             const match = row.textContent.toLowerCase().includes(filter);
-            row.style.display = match ? '' : 'none';
+            row.style.display = match ? '' : (row.parentNode.tagName === 'TFOOT' ? '' : 'none');
         });
     });
 </script>

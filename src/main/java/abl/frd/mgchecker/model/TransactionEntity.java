@@ -6,6 +6,7 @@ import abl.frd.mgchecker.enumpack.SourceType;
 import javax.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(
@@ -14,6 +15,9 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_recon_key", columnList = "transaction_no,amount,legacy_id"),
                 @Index(name = "idx_status", columnList = "reconStatus"),
                 @Index(name = "idx_source", columnList = "sourceType")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"transaction_no","reference_no","org_country","amount","transaction_date","legacy_id","sourceType"})
         }
 )
 public class TransactionEntity {

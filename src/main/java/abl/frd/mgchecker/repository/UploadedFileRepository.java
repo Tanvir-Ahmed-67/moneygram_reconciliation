@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UploadedFileRepository extends JpaRepository<UploadedFileEntity, Integer> {
-    Optional<UploadedFileEntity> findById(Long id);
+    UploadedFileEntity findById(int id);
     List<UploadedFileEntity> findByStatus(FileStatus status);
     Optional<UploadedFileEntity> findByFileNameAndSourceType(String fileName, SourceType sourceType);
 
