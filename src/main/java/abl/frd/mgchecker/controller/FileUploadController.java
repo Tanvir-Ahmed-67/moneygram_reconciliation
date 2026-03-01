@@ -49,6 +49,10 @@ public class FileUploadController {
         this.reconciliationService = reconciliationService;
     }
     @GetMapping("/")
+    public String index() {
+        return "redirect:/files"; // This will make the root URL go to your Home Page
+    }
+    @GetMapping("/upload-file")
     public String showUploadPage(Model model) {
         // Fetch all files that are currently STAGED
         List<UploadedFileEntity> allStaged = fileUploadService.findByStatus(FileStatus.STAGED);
@@ -87,15 +91,15 @@ public class FileUploadController {
 
             if (noPayment && noSettlement) {
                 redirectAttributes.addFlashAttribute("message", "Error: No File Selected! Please Choose Atleast one!");
-                return "redirect:/";
+                return "redirect:/upload-file";
             }
             fileUploadService.processFiles(paymentFiles, settlementFiles);
             redirectAttributes.addFlashAttribute("message", "Files uploaded successfully! Click Process to reconcile.");
-            return "redirect:/";
+            return "redirect:/upload-file";
         }
         catch (Exception e) {
             redirectAttributes.addFlashAttribute("message", "Error: " + e.getMessage());
-            return "redirect:/";
+            return "redirect:/upload-file";
         }
     }
     @GetMapping("/summary")
@@ -301,7 +305,7 @@ public class FileUploadController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("message", "Error deleting file: " + e.getMessage());
         }
-        return "redirect:/upload";
+        return "redirect:/upload-file";
     }
     @PostMapping("/delete-files")
     public String deleteFiles(@RequestParam(value = "fileIds", required = false) List<Integer> fileIds,
@@ -310,7 +314,7 @@ public class FileUploadController {
             fileUploadService.deleteMultipleFiles(fileIds);
             redirectAttributes.addFlashAttribute("message", "Selected files removed.");
         }
-        return "redirect:/";
+        return "redirect:/upload-file";
     }
     // For the Modal View (returns JSON)
     @GetMapping("/files/view/{id}")

@@ -56,8 +56,8 @@
         <a class="navbar-brand" href="#">FRD <span class="fw-light">Reconciliation</span></a>
         <div class="d-flex align-items-center gap-3">
             <input type="text" id="summarySearch" class="form-control form-control-sm search-box" placeholder="Quick search date (e.g. 2024-05-20)...">
+            <a th:href="@{/files}" class="btn btn-outline-light btn-sm px-3">Home Page</a>
             <a th:href="@{/summary}" class="btn btn-outline-light btn-sm px-3">Summary View</a>
-            <a th:href="@{/files}" class="btn btn-outline-light btn-sm px-3">File History</a>
             <form th:action="@{/logout}" method="post" class="m-0">
                 <button type="submit" class="btn btn-danger btn-sm px-3">Sign Out</button>
             </form>

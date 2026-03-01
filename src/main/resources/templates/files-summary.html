@@ -19,8 +19,9 @@
 
     /* Subtle Status Indicators */
     .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-    .bg-completed { background-color: #10b981; }
-    .bg-pending { background-color: #f59e0b; }
+    .bg-processed { background-color: #10b981 !important; } /* Green */
+    .bg-staged { background-color: #f59e0b !important; }   /* Orange/Yellow */
+    .bg-pending { background-color: #3b82f6 !important; }    /* Blue */
 
     /* Clean Table Styling */
     .card { border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: none; margin-bottom: 1.5rem; }
@@ -61,9 +62,9 @@
   <div class="container-fluid">
     <a class="navbar-brand" href="#">FRD <span class="fw-light">Reconciliation</span></a>
     <div class="d-flex align-items-center gap-3">
-      <input type="text" id="summarySearch" class="form-control form-control-sm search-box" placeholder="Quick search date (e.g. 2024-05-20)...">
+      <input type="text" id="fileSearch" class="form-control form-control-sm search-box" placeholder="Quick search date (e.g. 2024-05-20)...">
       <a th:href="@{/summary}" class="btn btn-outline-light btn-sm px-3">Summary View</a>
-      <a th:href="@{/}" class="btn btn-outline-light btn-sm px-3">New Upload</a>
+      <a th:href="@{/upload-file}" class="btn btn-outline-light btn-sm px-3">New Upload</a>
       <form th:action="@{/logout}" method="post" class="m-0">
         <button type="submit" class="btn btn-danger btn-sm px-3">Sign Out</button>
       </form>
@@ -83,22 +84,23 @@
           <table class="table table-sm align-middle mb-0">
             <thead>
             <tr>
-              <th class="ps-3" style="width: 45%;">File Name</th>
+              <th class="ps-3" style="width: 10%;">File Id</th>
+              <th class="ps-3" style="width: 40%;">File Name</th>
               <th class="text-center" style="width: 10%;">Count</th>
               <th class="text-end" style="width: 20%;">Amount</th>
-              <th class="text-center" style="width: 25%;">Actions</th>
+              <th class="text-center" style="width: 20%;">Actions</th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="file : ${entry.value}" class="file-row">
+              <td class="text-center" th:text="${file.id}"></td>
               <td class="ps-3">
-                <span class="status-dot" th:classappend="${file.processingStatus == 'COMPLETED' ? 'bg-completed' : 'bg-pending'}"></span>
+                <span class="status-dot" th:classappend="${file.status.name() == 'PROCESSED' ? 'bg-processed' : (file.status.name() == 'STAGED' ? 'bg-staged' : 'bg-pending')}"></span>
                 <span class="file-name-text" style="word-break: break-all;" th:text="${file.fileName}"></span>
               </td>
               <td class="text-center" th:text="${file.totalTransactions}"></td>
               <td class="text-end" th:text="${#numbers.formatDecimal(file.totalAmount, 1, 'COMMA', 2, 'POINT')}"></td>
               <td class="text-center">
-                <button class="btn btn-outline-primary btn-action" th:onclick="'viewFile(' + ${file.id} + ')'">View</button>
                 <a th:href="@{'/download-file/' + ${file.id}}" class="btn btn-outline-success btn-action">Download</a>
               </td>
             </tr>
@@ -117,22 +119,23 @@
           <table class="table table-sm align-middle mb-0">
             <thead>
             <tr>
-              <th class="ps-3" style="width: 45%;">File Name</th>
+              <th class="ps-3" style="width: 10%;">File Id</th>
+              <th class="ps-3" style="width: 40%;">File Name</th>
               <th class="text-center" style="width: 10%;">Count</th>
               <th class="text-end" style="width: 20%;">Amount</th>
-              <th class="text-center" style="width: 25%;">Actions</th>
+              <th class="text-center" style="width: 20%;">Actions</th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="file : ${entry.value}" class="file-row">
+              <td class="text-center" th:text="${file.id}"></td>
               <td class="ps-3">
-                <span class="status-dot" th:classappend="${file.processingStatus == 'COMPLETED' ? 'bg-completed' : 'bg-pending'}"></span>
+                <span class="status-dot" th:classappend="${file.status.name() == 'PROCESSED' ? 'bg-processed' : (file.status.name() == 'STAGED' ? 'bg-staged' : 'bg-pending')}"></span>
                 <span class="file-name-text" style="word-break: break-all;" th:text="${file.fileName}"></span>
               </td>
               <td class="text-center" th:text="${file.totalTransactions}"></td>
               <td class="text-end" th:text="${#numbers.formatDecimal(file.totalAmount, 1, 'COMMA', 2, 'POINT')}"></td>
               <td class="text-center">
-                <button class="btn btn-outline-primary btn-action" th:onclick="'viewFile(' + ${file.id} + ')'">View</button>
                 <a th:href="@{'/download-file/' + ${file.id}}" class="btn btn-outline-success btn-action">Download</a>
               </td>
             </tr>
@@ -179,26 +182,6 @@
       row.style.display = name.includes(val) ? "" : "none";
     });
   });
-
-  // AJAX View Content
-  function viewFile(id) {
-    fetch('/files/view/' + id)
-            .then(res => res.json())
-            .then(data => {
-              const body = document.getElementById('modalTableBody');
-              body.innerHTML = data.map(t => `
-                    <tr>
-                        <td class="ps-3">${t.transactionNo}</td>
-                        <td>${t.transactionDate}</td>
-                        <td class="text-end">${t.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td class="text-center">
-                            <span class="badge ${t.reconStatus === 'M' ? 'bg-success' : 'bg-secondary'}" style="font-size: 0.65rem;">${t.reconStatus}</span>
-                        </td>
-                    </tr>
-                `).join('');
-              new bootstrap.Modal(document.getElementById('viewModal')).show();
-            });
-  }
 </script>
 </body>
 </html>

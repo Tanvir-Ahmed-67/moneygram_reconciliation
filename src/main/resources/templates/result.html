@@ -52,9 +52,10 @@
     <div class="container-fluid">
         <a class="navbar-brand" href="#">FRD <span class="fw-light">Reconciliation</span></a>
         <div class="d-flex align-items-center gap-3">
-            <input type="text" id="summarySearch" class="form-control form-control-sm search-box" placeholder="Quick search date (e.g. 2024-05-20)...">
+            <!--<input type="text" id="tableSearch" class="form-control form-control-sm search-box" placeholder="Quick search date (e.g. 2024-05-20)...">-->
+            <a th:href="@{/files}" class="btn btn-outline-light btn-sm px-3">Home Page</a>
             <a th:href="@{/summary}" class="btn btn-outline-light btn-sm px-3">Summary View</a>
-            <a th:href="@{/}" class="btn btn-outline-light btn-sm px-3">New Upload</a>
+            <a th:href="@{/upload-file}" class="btn btn-outline-light btn-sm px-3">New Upload</a>
             <form th:action="@{/logout}" method="post" class="m-0">
                 <button type="submit" class="btn btn-danger btn-sm px-3">Sign Out</button>
             </form>
@@ -71,10 +72,6 @@
                 <strong>Data for: </strong><span class="text-primary fw-bold" th:text="${upToDate}">N/A</span>
             </p>
         </div>
-        <div class="d-flex gap-2">
-            <a th:if="${isFiltered}" th:href="@{/result}" class="btn btn-primary btn-sm btn-export px-3">View All Unreconciled</a>
-            <button id="exportExcel" class="btn btn-success btn-sm btn-export px-3">Download Excel</button>
-        </div>
     </div>
 
     <div class="date-filter-box mb-4">
@@ -90,9 +87,12 @@
             <div class="col-md-2">
                 <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Apply Filter</button>
             </div>
-            <div class="col-md-4 ms-auto">
-                <label class="form-label small fw-bold text-muted mb-1" style="font-size: 0.7rem;">SEARCH</label>
-                <input type="text" id="tableSearch" class="form-control form-control-sm">
+
+            <div class="col-md-2 ms-auto">
+                <a th:if="${isFiltered}" th:href="@{/result}" class="btn btn-primary btn-sm btn-export px-3">View All Unreconciled</a>
+            </div>
+            <div class="col-md-2 ms-auto">
+                <button id="exportExcel" class="btn btn-success btn-sm btn-export px-3">Download Excel</button>
             </div>
         </form>
     </div>
@@ -103,6 +103,7 @@
                 <thead>
                 <tr>
                     <th>Serial</th>
+                    <th>File Id</th>
                     <th>Legacy ID</th>
                     <th>Txn. No</th>
                     <th>Txn. Date</th>
@@ -115,6 +116,7 @@
                 <tbody>
                 <tr th:each="txn, stat : ${allData}">
                     <td th:text="${stat.index + 1}"></td>
+                    <td th:text="${txn.uploadedFile.id}"></td>
                     <td th:text="${txn.legacyId}"></td>
                     <td th:text="${txn.transactionNo}"></td>
                     <td th:text="${txn.transactionDate}"></td>
