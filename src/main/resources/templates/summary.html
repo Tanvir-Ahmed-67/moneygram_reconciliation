@@ -151,7 +151,7 @@
     </div>
   </div>
 </div>
-<script>
+<script type="text/javascript">
   // JavaScript Search for Table Rows
   document.getElementById('summarySearch').addEventListener('keyup', function() {
     const query = this.value.toLowerCase();
@@ -165,15 +165,20 @@
       const match = content.includes(query);
 
       row.style.display = match ? "" : "none";
-      if(match) visibleCount++;
+      if (match) visibleCount++;
     });
+    // Hide Footer if searching to prevent misleading "Grand Totals"
+    if (footer) {
+      footer.style.display = (query.length > 0) ? "none" : "";
+    }
+  });
     // --- 2. DOWNLOAD LOGIC ---
     document.getElementById('exportBtn').addEventListener('click', function() {
+      console.log("hello");
       if (typeof XLSX === 'undefined') {
         alert("Excel Library not loaded. Check internet connection.");
         return;
       }
-
       // Get table element
       const table = document.getElementById('summaryTable');
 
@@ -185,6 +190,7 @@
          The "Action" column is the 8th column (index H).
          We delete the 'H' key from every row in the worksheet object.
       */
+
       Object.keys(ws).forEach(key => {
         if (key.startsWith('H')) delete ws[key];
       });
@@ -194,12 +200,6 @@
       // Save File
       XLSX.writeFile(wb, "Recon_Summary_" + new Date().toLocaleDateString() + ".xlsx");
     });
-
-    // Hide Footer if searching to prevent misleading "Grand Totals"
-    if (footer) {
-      footer.style.display = (query.length > 0) ? "none" : "";
-    }
-  });
 </script>
 </body>
 </html>
