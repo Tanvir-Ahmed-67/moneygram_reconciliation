@@ -78,6 +78,12 @@
     <div class="col-md-6">
       <p class="text-muted small fw-bold mb-3 text-uppercase">Payment File History</p>
 
+      <div th:if="${#maps.isEmpty(paymentGroups)}" class="card border-0 bg-light">
+        <div class="card-body text-center py-5">
+          <p class="text-muted mb-0">No payment file found.</p>
+        </div>
+      </div>
+
       <div th:each="entry : ${paymentGroups}">
         <span class="date-pill" th:text="${#temporals.format(entry.key, 'dd MMM yyyy')}"></span>
         <div class="card">
@@ -95,7 +101,7 @@
             <tr th:each="file : ${entry.value}" class="file-row">
               <td class="text-center" th:text="${file.id}"></td>
               <td class="ps-3">
-                <span class="status-dot" th:classappend="${file.status.name() == 'PROCESSED' ? 'bg-processed' : (file.status.name() == 'STAGED' ? 'bg-staged' : 'bg-pending')}"></span>
+                <span class="status-dot" th:classappend="${file.status?.name() == 'PROCESSED' ? 'bg-processed' : (file.status?.name() == 'STAGED' ? 'bg-staged' : 'bg-pending')}"></span>
                 <span class="file-name-text" style="word-break: break-all;" th:text="${file.fileName}"></span>
               </td>
               <td class="text-center" th:text="${file.totalTransactions}"></td>
@@ -112,6 +118,12 @@
 
     <div class="col-md-6">
       <p class="text-muted small fw-bold mb-3 text-uppercase">Settlement File History</p>
+
+      <div th:if="${#maps.isEmpty(settlementGroups)}" class="card border-0 bg-light">
+        <div class="card-body text-center py-5">
+          <p class="text-muted mb-0">No settlement file found.</p>
+        </div>
+      </div>
 
       <div th:each="entry : ${settlementGroups}">
         <span class="date-pill" th:text="${#temporals.format(entry.key, 'dd MMM yyyy')}"></span>
@@ -130,7 +142,7 @@
             <tr th:each="file : ${entry.value}" class="file-row">
               <td class="text-center" th:text="${file.id}"></td>
               <td class="ps-3">
-                <span class="status-dot" th:classappend="${file.status.name() == 'PROCESSED' ? 'bg-processed' : (file.status.name() == 'STAGED' ? 'bg-staged' : 'bg-pending')}"></span>
+                <span class="status-dot" th:classappend="${file.status?.name() == 'PROCESSED' ? 'bg-processed' : (file.status?.name() == 'STAGED' ? 'bg-staged' : 'bg-pending')}"></span>
                 <span class="file-name-text" style="word-break: break-all;" th:text="${file.fileName}"></span>
               </td>
               <td class="text-center" th:text="${file.totalTransactions}"></td>
