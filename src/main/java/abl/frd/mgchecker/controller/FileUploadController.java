@@ -29,7 +29,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -72,33 +71,23 @@ public class FileUploadController {
     public String login() {
         return "login";
     }
-
     @PostMapping("/upload")
     public String handleFileUpload(
-            @RequestParam(value = "payment_file", required = false)
-            List<MultipartFile> paymentFiles,
-
-            @RequestParam(value = "settlement_file", required = false)
-            List<MultipartFile> settlementFiles,
-
+            @RequestParam(value = "payment_file", required = false) List<MultipartFile> paymentFiles,
+            @RequestParam(value = "settlement_file", required = false) List<MultipartFile> settlementFiles,
             RedirectAttributes redirectAttributes) {
         try {
-            List<UploadedFileEntity> stagedFiles = fileUploadService.findByStatus(FileStatus.STAGED);
-            redirectAttributes.addFlashAttribute("stagedFiles", stagedFiles);
-            // 1. Check if both lists are null/empty OR if the first element is actually empty
-            boolean noPayment = isFileMissing(paymentFiles);
-            boolean noSettlement = isFileMissing(settlementFiles);
-
-            if (noPayment && noSettlement) {
-                redirectAttributes.addFlashAttribute("message", "Error: No File Selected! Please Choose Atleast one!");
+            if (isFileMissing(paymentFiles) && isFileMissing(settlementFiles)) {
+                redirectAttributes.addFlashAttribute("message", "<div class='text-danger'><strong>Error: No file selected!</strong><ul class='mb-0'>");
                 return "redirect:/upload-file";
             }
-            fileUploadService.processFiles(paymentFiles, settlementFiles);
-            redirectAttributes.addFlashAttribute("message", "Files uploaded successfully! Click Process to reconcile.");
+
+            // Capture the result message from the service
+            String resultMsg = fileUploadService.processFiles(paymentFiles, settlementFiles);
+            redirectAttributes.addFlashAttribute("message", resultMsg);
             return "redirect:/upload-file";
-        }
-        catch (Exception e) {
-            redirectAttributes.addFlashAttribute("message", "Error: " + e.getMessage());
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("message", "<div class='text-danger'><strong>System Error:</strong><ul class='mb-0'>" + e.getMessage());
             return "redirect:/upload-file";
         }
     }
@@ -299,13 +288,24 @@ public class FileUploadController {
     }
     @PostMapping("/file/delete/{id}")
     public String deleteFile(@PathVariable Integer id, RedirectAttributes redirectAttributes) {
-        try {
-            fileUploadService.deleteUploadedFile(id);
-            redirectAttributes.addFlashAttribute("message", "File deleted successfully.");
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("message", "Error deleting file: " + e.getMessage());
+        UploadedFileEntity file = fileUploadService.findById(id);
+        if (file == null) return "redirect:/files";
+
+        // Check status using == for null safety
+        boolean wasProcessed = (file.getStatus() == FileStatus.PROCESSED);
+
+        // 1. Delete the file and its transactions
+        fileUploadService.deleteUploadedFile(id);
+
+        if (wasProcessed) {
+            // 2. RE-RUN EVERYTHING
+            // This ensures orphans from the deleted file are re-matched or marked unmatched
+            reconciliationService.reconcileFromScratch();
+            redirectAttributes.addFlashAttribute("message", "File deleted and full reconciliation re-run.");
+        } else {
+            redirectAttributes.addFlashAttribute("message", "Staged file removed.");
         }
-        return "redirect:/upload-file";
+        return "redirect:/files";
     }
     @PostMapping("/delete-files")
     public String deleteFiles(@RequestParam(value = "fileIds", required = false) List<Integer> fileIds,

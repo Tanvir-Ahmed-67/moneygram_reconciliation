@@ -13,8 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class ReconciliationService {
@@ -35,87 +35,83 @@ public class ReconciliationService {
     }
     @Transactional
     public void reconcileIncremental() {
+        // Step 1: Bulk Find Matches
+        List<Object[]> matches = txnRepo.findAllPotentialMatches();
+        List<ReconciliationMatch> matchBatch = new ArrayList<>();
+        List<String> matchedNos = new ArrayList<>();
 
-        // 1️⃣ Exact matches between all staged PAYMENT and SETTLEMENT transactions
-        List<Object[]> matches =
-                txnRepo.findExactMatches(
-                        SourceType.PAYMENT,
-                        SourceType.SETTLEMENT,
-                        ReconStatus.S
-                );
         for (Object[] row : matches) {
-            String payId = String.valueOf(row[0]);
-            String setId = String.valueOf(row[1]);
-            saveMatchAndUpdateStatus(payId, setId);
-        }
+            ReconciliationMatch m = new ReconciliationMatch();
+            m.setPaymentTransactionNo((String) row[0]);
+            m.setSettlementTransactionNo((String) row[1]);
+            m.setMatchType(MatchType.EXACT);
+            m.setMatchedOn(LocalDateTime.now());
 
-        // 2️⃣ Re-check all previously unmatched transactions
-        List<ReconciliationUnmatched> unmatchedList = unmatchRepo.findAll();
+            matchBatch.add(m);
+            matchedNos.add((String) row[0]);
+            matchedNos.add((String) row[1]);
 
-        for (ReconciliationUnmatched um : unmatchedList) {
-            TransactionEntity txn = txnRepo
-                    .findByTransactionNoAndSourceType(um.getTransactionNo(), um.getSourceType())
-                    .orElse(null);
-
-            if (txn == null) continue;
-
-            List<TransactionEntity> possibleMatches = txnRepo
-                    .findByTransactionNoAndReferenceNoAndOriginatingCountryAndAmountAndTransactionDateAndReconStatus(
-                            txn.getTransactionNo(),
-                            txn.getReferenceNo(),
-                            txn.getOriginatingCountry(),
-                            txn.getAmount(),
-                            txn.getTransactionDate(),
-                            ReconStatus.S
-                    ).stream()
-                    .filter(t -> t.getSourceType() != txn.getSourceType())
-                    .collect(Collectors.toList());
-
-            if (!possibleMatches.isEmpty()) {
-                TransactionEntity matchedTxn = possibleMatches.get(0);
-                saveMatchAndUpdateStatus(
-                        txn.getSourceType() == SourceType.PAYMENT ? txn.getTransactionNo() : matchedTxn.getTransactionNo(),
-                        txn.getSourceType() == SourceType.SETTLEMENT ? txn.getTransactionNo() : matchedTxn.getTransactionNo()
-                );
-                unmatchRepo.delete(um);
+            if (matchBatch.size() >= 500) {
+                matchRepo.saveAll(matchBatch);
+                txnRepo.updateStatusBulk(matchedNos, ReconStatus.M);
+                matchBatch.clear();
+                matchedNos.clear();
             }
         }
-        // 3️⃣ Add remaining staged transactions as unmatched
-        List<TransactionEntity> stillUnmatched = txnRepo.findByReconStatus(ReconStatus.S);
-
-        for (TransactionEntity txn : stillUnmatched) {
-
-            boolean alreadyExists = unmatchRepo.existsByTransactionNoAndSourceType(
-                    txn.getTransactionNo(),
-                    txn.getSourceType()
-            );
-
-            if (!alreadyExists) {
-                ReconciliationUnmatched um = new ReconciliationUnmatched();
-                um.setTransactionNo(txn.getTransactionNo());
-                um.setReferenceNo(txn.getReferenceNo());
-                um.setSourceType(txn.getSourceType());
-                um.setReason(UnmatchReason.NOT_FOUND);
-                um.setDetectedOn(LocalDateTime.now());
-
-                unmatchRepo.save(um);
-            }
-            txn.setReconStatus(ReconStatus.U); // mark as unmatched
+        if (!matchBatch.isEmpty()) {
+            matchRepo.saveAll(matchBatch);
+            txnRepo.updateStatusBulk(matchedNos, ReconStatus.M);
         }
-        // 4️⃣ Mark all staged files as PROCESSED
-        List<UploadedFileEntity> stagedFiles = uploadedFileRepo.findByStatus(FileStatus.STAGED);
-        stagedFiles.forEach(file -> file.setStatus(FileStatus.PROCESSED));
+        // Step 2: Mark everything else that was 'S' as 'U' (ONE SQL COMMAND)
+        txnRepo.updateRemainingToUnmatched(ReconStatus.S, ReconStatus.U);
+        // Step 3: Populate the Unmatched table
+        syncUnmatchedTable();
+        // STEP 4: UPDATE FILE METADATA STATUS
+        updateFileStatuses();
     }
+    @Transactional
+    public void syncUnmatchedTable() {
+        // Get all transactions marked 'U' that aren't in the Unmatched table yet
+        List<TransactionEntity> newUnmatched = txnRepo.findNewUnmatched();
 
-    private void saveMatchAndUpdateStatus(String paymentId, String settlementId) {
-        ReconciliationMatch match = new ReconciliationMatch();
-        match.setPaymentTransactionNo(paymentId);
-        match.setSettlementTransactionNo(settlementId);
-        match.setMatchType(MatchType.EXACT);
-        match.setMatchedOn(LocalDateTime.now());
+        List<ReconciliationUnmatched> batch = new ArrayList<>();
+        for (TransactionEntity txn : newUnmatched) {
+            ReconciliationUnmatched um = new ReconciliationUnmatched();
+            um.setTransactionNo(txn.getTransactionNo());
+            um.setReferenceNo(txn.getReferenceNo());
+            um.setSourceType(txn.getSourceType());
+            um.setReason(UnmatchReason.NOT_FOUND);
+            um.setDetectedOn(LocalDateTime.now());
+            batch.add(um);
 
-        matchRepo.save(match);
-        txnRepo.updateStatus(paymentId, ReconStatus.M);
-        txnRepo.updateStatus(settlementId, ReconStatus.M);
+            if (batch.size() >= 500) {
+                unmatchRepo.saveAll(batch);
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty()) {
+            unmatchRepo.saveAll(batch);
+        }
+    }
+    @Transactional
+    public void reconcileFromScratch() {
+        matchRepo.deleteAll();
+        unmatchRepo.deleteAll();
+        txnRepo.resetAllToStaged();
+        // 4. Run the standard logic
+        reconcileIncremental();
+    }
+    @Transactional
+    public void updateFileStatuses() {
+        // 1. Identify files that have finished reconciliation
+        List<UploadedFileEntity> readyFiles = uploadedFileRepo.findFilesReadyToProcess();
+
+        if (!readyFiles.isEmpty()) {
+            for (UploadedFileEntity file : readyFiles) {
+                file.setStatus(FileStatus.PROCESSED);
+            }
+            // 2. Save all status changes in one batch
+            uploadedFileRepo.saveAll(readyFiles);
+        }
     }
 }
