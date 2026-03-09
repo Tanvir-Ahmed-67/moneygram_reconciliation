@@ -11,9 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 import java.util.*;
 
 
@@ -25,8 +22,6 @@ public class FileUploadService {
     private final ReconciliationService reconciliationService;
     private final ReconciliationUnmatchedRepository reconciliationUnmatchedRepository;
     private final ReconciliationMatchRepository reconciliationMatchedRepository;
-    @PersistenceContext
-    private EntityManager entityManager;
     @Autowired
     private FileStorageService fileStorageService;
 
@@ -79,17 +74,24 @@ public class FileUploadService {
     }
     @Transactional
     public void deleteUploadedFile(Integer fileId) {
-        UploadedFileEntity file = uploadedFileRepository.findById(fileId).orElseThrow(() -> new RuntimeException("File not found"));
-        List<String> txnNumbers = txnRepo.findTransactionNosByFileId(fileId);
-
-        if (!txnNumbers.isEmpty()) {
-            reconciliationMatchedRepository.deleteByPaymentTxnNoInOrSettlementTxnNoIn(txnNumbers);
-            reconciliationUnmatchedRepository.deleteByTransactionNoIn(txnNumbers);
-            entityManager.flush();
-            txnRepo.deleteByUploadedFile(file);
-            entityManager.flush();
+        // 1. Reset Partners (Transactions from OTHER files that were matched to THIS file)
+        // We move them back to 'S' (Staged) so they can find new matches in the next run.
+        List<Integer> partnerIds = reconciliationMatchedRepository.findPartnerIdsByFileId(fileId);
+        if (!partnerIds.isEmpty()) {
+            txnRepo.updateStatusByIdsNative(partnerIds, "S");
         }
-        uploadedFileRepository.delete(file);
+
+        // 2. Delete matches where THIS file was either the Payment or Settlement side
+        reconciliationMatchedRepository.deleteByFileIdNative(fileId);
+
+        // 3. Delete unmatched records for THIS file
+        reconciliationUnmatchedRepository.deleteByFileIdNative(fileId);
+
+        // 4. Delete the actual transactions of THIS file
+        txnRepo.deleteByFileIdNative(fileId);
+
+        // 5. Delete the file record
+        uploadedFileRepository.deleteById(fileId);
     }
 
     private static class FileTask {

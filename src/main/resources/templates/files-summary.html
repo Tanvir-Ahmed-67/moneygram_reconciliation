@@ -40,6 +40,8 @@
 </nav>
 
 <div class="container-fluid px-4 py-4">
+  <div th:if="${message}" class="alert alert-success py-2 small" th:text="${message}"></div>
+  <div th:if="${errorMessage}" class="alert alert-danger py-2 small" th:text="${errorMessage}"></div>
   <div class="row g-4">
 
     <div class="col-md-6">
@@ -80,7 +82,7 @@
                     <i class="bi bi-download"></i> Download
                   </a>
                   <form th:action="@{'/file/delete/' + ${file.id}}" method="post" class="d-inline m-0"
-                        onsubmit="return confirm('Warning: Deleting a PROCESSED file will trigger a full re-reconciliation. Continue?');">
+                        onsubmit="return confirmDelete(event, this);">
                     <button type="submit" class="btn btn-sm btn-outline-danger btn-action">
                       <i class="bi bi-trash"></i> Delete
                     </button>
@@ -131,7 +133,7 @@
                     <i class="bi bi-download"></i> Download
                   </a>
                   <form th:action="@{'/file/delete/' + ${file.id}}" method="post" class="d-inline m-0"
-                        onsubmit="return confirm('Warning: Deleting a PROCESSED file will trigger a full re-reconciliation. Continue?');">
+                        onsubmit="return confirmDelete(event, this);">
                     <button type="submit" class="btn btn-sm btn-outline-danger btn-action">
                       <i class="bi bi-trash"></i> Delete
                     </button>
@@ -180,6 +182,31 @@
       row.style.display = name.includes(val) ? "" : "none";
     });
   });
+</script>
+<script>
+  function confirmDelete(event, formElement) {
+    event.preventDefault(); // Stop the form from submitting immediately
+
+    // 1. Initial Confirmation
+    const firstCheck = confirm("Warning: Deleting a PROCESSED file will trigger a full re-reconciliation. Continue?");
+
+    if (firstCheck) {
+      // 2. Ask for password
+      const userPassword = prompt("CRITICAL ACTION: Please enter the Admin Password to confirm deletion:");
+
+      if (userPassword) {
+        // 3. Create a hidden input to send the password to the controller
+        const passwordInput = document.createElement("input");
+        passwordInput.type = "hidden";
+        passwordInput.name = "adminPassword";
+        passwordInput.value = userPassword;
+
+        formElement.appendChild(passwordInput);
+        formElement.submit(); // Send to Controller
+      }
+    }
+    return false;
+  }
 </script>
 </body>
 </html>

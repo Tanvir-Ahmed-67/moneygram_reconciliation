@@ -287,23 +287,31 @@ public class FileUploadController {
         }
     }
     @PostMapping("/file/delete/{id}")
-    public String deleteFile(@PathVariable Integer id, RedirectAttributes redirectAttributes) {
-        UploadedFileEntity file = fileUploadService.findById(id);
-        if (file == null) return "redirect:/files";
+    public String deleteFile(
+            @PathVariable Integer id,
+            @RequestParam("adminPassword") String adminPassword,
+            RedirectAttributes redirectAttributes) {
+        final String REQUIRED_PASSWORD = "M@g#123";
+        if (!REQUIRED_PASSWORD.equals(adminPassword)) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Unauthorized: Incorrect Admin Password. Deletion failed.");
+            return "redirect:/files";
+        }
+        try {
+            UploadedFileEntity file = fileUploadService.findById(id);
+            if (file == null) return "redirect:/files";
+            boolean wasProcessed = (file.getStatus() == FileStatus.PROCESSED);
 
-        // Check status using == for null safety
-        boolean wasProcessed = (file.getStatus() == FileStatus.PROCESSED);
+            // Run the working Sequential Solution we established
+            fileUploadService.deleteUploadedFile(id);
 
-        // 1. Delete the file and its transactions
-        fileUploadService.deleteUploadedFile(id);
-
-        if (wasProcessed) {
-            // 2. RE-RUN EVERYTHING
-            // This ensures orphans from the deleted file are re-matched or marked unmatched
-            reconciliationService.reconcileFromScratch();
-            redirectAttributes.addFlashAttribute("message", "File deleted and full reconciliation re-run.");
-        } else {
-            redirectAttributes.addFlashAttribute("message", "Staged file removed.");
+            if (wasProcessed) {
+                reconciliationService.reconcileIncremental();
+                redirectAttributes.addFlashAttribute("message", "File deleted and reconciliation updated.");
+            } else {
+                redirectAttributes.addFlashAttribute("message", "Staged file removed.");
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Error during deletion: " + e.getMessage());
         }
         return "redirect:/files";
     }

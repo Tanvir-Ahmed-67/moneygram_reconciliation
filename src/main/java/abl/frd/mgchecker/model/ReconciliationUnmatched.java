@@ -10,13 +10,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "reconciliation_unmatched",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"transaction_no", "source_type"})
-        },
-        indexes = {
-                @Index(
-                        name = "idx_unmatched_txn_source",
-                        columnList = "transaction_no, source_type"
-                )
+                @UniqueConstraint(name = "uk_unmatched_txn_id", columnNames = {"transaction_id"})
         }
 )
 public class ReconciliationUnmatched {
@@ -24,6 +18,12 @@ public class ReconciliationUnmatched {
     @Column(name = "id")
     @GeneratedValue(strategy= GenerationType.IDENTITY)
     private int  id;
+
+    @Column(name = "transaction_id", nullable = false)
+    private int transactionId; // FK to transactions.id
+
+    @Column(name = "file_id")
+    private Integer fileId;
     @Column(name = "transaction_no", length=30, nullable = false)
     private String transactionNo;
 
@@ -86,5 +86,21 @@ public class ReconciliationUnmatched {
 
     public void setReferenceNo(String referenceNo) {
         this.referenceNo = referenceNo;
+    }
+
+    public int getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(int transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public Integer getFileId() {
+        return fileId;
+    }
+
+    public void setFileId(Integer fileId) {
+        this.fileId = fileId;
     }
 }

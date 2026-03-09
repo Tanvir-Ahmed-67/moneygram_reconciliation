@@ -9,15 +9,26 @@ import abl.frd.mgchecker.repository.ReconciliationMatchRepository;
 import abl.frd.mgchecker.repository.ReconciliationUnmatchedRepository;
 import abl.frd.mgchecker.repository.TransactionRepository;
 import abl.frd.mgchecker.repository.UploadedFileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class ReconciliationService {
+    @Autowired
+    @Lazy // Prevents circular dependency error
+    private ReconciliationService self;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private final TransactionRepository txnRepo;
     private final ReconciliationMatchRepository matchRepo;
@@ -33,55 +44,88 @@ public class ReconciliationService {
         this.unmatchRepo = unmatchRepo;
         this.uploadedFileRepo = uploadedFileRepo;
     }
-    @Transactional
     public void reconcileIncremental() {
-        // Step 1: Bulk Find Matches
+        // PHASE 1: EXACT MATCHING
         List<Object[]> matches = txnRepo.findAllPotentialMatches();
         List<ReconciliationMatch> matchBatch = new ArrayList<>();
-        List<String> matchedNos = new ArrayList<>();
+        List<Integer> matchedIds = new ArrayList<>();
 
         for (Object[] row : matches) {
             ReconciliationMatch m = new ReconciliationMatch();
-            m.setPaymentTransactionNo((String) row[0]);
-            m.setSettlementTransactionNo((String) row[1]);
-            m.setMatchType(MatchType.EXACT);
+            m.setPaymentId((Integer) row[0]);
+            m.setSettlementId((Integer) row[1]);
+            m.setTransactionNo((String) row[2]);
+            m.setAmount((BigDecimal) row[3]);
+            m.setReferenceNo((String) row[4]);
+            m.setOrgCountry((String) row[5]);
+            m.setTransactionDate((String) row[6]);
+            m.setLegacyId((String) row[7]);
+            m.setPaymentFileId((Integer) row[8]);
+            m.setSettlementFileId((Integer) row[9]);
             m.setMatchedOn(LocalDateTime.now());
+            m.setMatchType(MatchType.EXACT);
 
             matchBatch.add(m);
-            matchedNos.add((String) row[0]);
-            matchedNos.add((String) row[1]);
+            matchedIds.add((Integer) row[0]);
+            matchedIds.add((Integer) row[1]);
 
             if (matchBatch.size() >= 500) {
-                matchRepo.saveAll(matchBatch);
-                txnRepo.updateStatusBulk(matchedNos, ReconStatus.M);
+                self.saveMatchesAndCleanUnmatched(matchBatch, matchedIds);
                 matchBatch.clear();
-                matchedNos.clear();
+                matchedIds.clear();
             }
         }
         if (!matchBatch.isEmpty()) {
-            matchRepo.saveAll(matchBatch);
-            txnRepo.updateStatusBulk(matchedNos, ReconStatus.M);
+            self.saveMatchesAndCleanUnmatched(matchBatch, matchedIds);
         }
-        // Step 2: Mark everything else that was 'S' as 'U' (ONE SQL COMMAND)
-        txnRepo.updateRemainingToUnmatched(ReconStatus.S, ReconStatus.U);
-        // Step 3: Populate the Unmatched table
-        syncUnmatchedTable();
-        // STEP 4: UPDATE FILE METADATA STATUS
-        updateFileStatuses();
-    }
-    @Transactional
-    public void syncUnmatchedTable() {
-        // Get all transactions marked 'U' that aren't in the Unmatched table yet
-        List<TransactionEntity> newUnmatched = txnRepo.findNewUnmatched();
 
+        // PHASE 2: PHYSICAL COMMIT OF 'U' STATUS
+        self.markRemainingAsUnmatched();
+
+        // PHASE 3: SYNC TO REPORT TABLE
+        self.syncUnmatchedTable();
+
+        // PHASE 4: UPDATE FILES
+        self.updateFileStatuses();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveMatchesAndCleanUnmatched(List<ReconciliationMatch> matches, List<Integer> ids) {
+        matchRepo.saveAll(matches);
+        // Use the NATIVE method
+        txnRepo.updateStatusByIdsNative(ids, "M");
+        unmatchRepo.deleteByTransactionIdInNative(ids);
+
+        // Clear Hibernate memory so it doesn't revert 'M' back to 'S'
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markRemainingAsUnmatched() {
+        // Force the update at the DB level
+        txnRepo.updateRemainingToUnmatchedNative("S", "U");
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void syncUnmatchedTable() {
+        // Use the NATIVE method to see the 'U' status physically in the DB
+        List<TransactionEntity> newUnmatched = txnRepo.findNewUnmatchedNative();
         List<ReconciliationUnmatched> batch = new ArrayList<>();
+
         for (TransactionEntity txn : newUnmatched) {
             ReconciliationUnmatched um = new ReconciliationUnmatched();
+            um.setTransactionId(txn.getId());
             um.setTransactionNo(txn.getTransactionNo());
             um.setReferenceNo(txn.getReferenceNo());
             um.setSourceType(txn.getSourceType());
             um.setReason(UnmatchReason.NOT_FOUND);
             um.setDetectedOn(LocalDateTime.now());
+            if(txn.getUploadedFile() != null) {
+                um.setFileId(txn.getUploadedFile().getId());
+            }
             batch.add(um);
 
             if (batch.size() >= 500) {
@@ -89,17 +133,10 @@ public class ReconciliationService {
                 batch.clear();
             }
         }
-        if (!batch.isEmpty()) {
-            unmatchRepo.saveAll(batch);
-        }
-    }
-    @Transactional
-    public void reconcileFromScratch() {
-        matchRepo.deleteAll();
-        unmatchRepo.deleteAll();
-        txnRepo.resetAllToStaged();
-        // 4. Run the standard logic
-        reconcileIncremental();
+        if (!batch.isEmpty()) unmatchRepo.saveAll(batch);
+
+        entityManager.flush();
+        entityManager.clear();
     }
     @Transactional
     public void updateFileStatuses() {
