@@ -5,8 +5,10 @@ import abl.frd.mgchecker.enumpack.ReconStatus;
 import abl.frd.mgchecker.enumpack.SourceType;
 import abl.frd.mgchecker.helper.FileSummary;
 import abl.frd.mgchecker.model.TransactionEntity;
+import abl.frd.mgchecker.model.TransactionStagingEntity;
 import abl.frd.mgchecker.model.UploadedFileEntity;
 import abl.frd.mgchecker.repository.TransactionRepository;
+import abl.frd.mgchecker.repository.TransactionStagingRepository;
 import abl.frd.mgchecker.repository.UploadedFileRepository;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,8 @@ public class FileStorageService {
 
     @Autowired
     private TransactionRepository txnRepo;
+    @Autowired
+    private TransactionStagingRepository txnStagingRepo;
     @Autowired
     private UploadedFileRepository uploadedFileRepository;
 
@@ -47,8 +51,6 @@ public class FileStorageService {
             if (uploadedFileRepository.findByFileNameAndSourceType(file.getOriginalFilename(), sourceType).isPresent()) {
                 return "Filename already exists.";
             }
-            // Fetching 1M Longs takes ~8MB of RAM. (Compare to ~150MB+ for Strings)
-            Set<Long> existingHashes = txnRepo.findAllTransactionHashes(sourceType.name());
 
             UploadedFileEntity uploadedFile = new UploadedFileEntity();
             uploadedFile.setFileName(file.getOriginalFilename());
@@ -58,8 +60,8 @@ public class FileStorageService {
             uploadedFile = uploadedFileRepository.save(uploadedFile);
 
             FileSummary summary = (sourceType == SourceType.PAYMENT)
-                    ? parseAndSavePaymentFile(worksheet, sourceType, uploadedFile, existingHashes)
-                    : parseAndSaveSettlementFile(worksheet, sourceType, uploadedFile, existingHashes);
+                    ? parseAndSavePaymentFile(worksheet, sourceType, uploadedFile)
+                    : parseAndSaveSettlementFile(worksheet, sourceType, uploadedFile);
 
             uploadedFile.setTotalTransactions(summary.getTotalCount());
             uploadedFile.setTotalAmount(summary.getTotalAmount());
@@ -71,11 +73,9 @@ public class FileStorageService {
         }
     }
 
-    private FileSummary parseAndSavePaymentFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile, Set<Long> existingHashes) throws Exception {
-        List<TransactionEntity> batch = new ArrayList<>();
+    private FileSummary parseAndSavePaymentFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile) throws Exception {
+        List<TransactionStagingEntity> batch = new ArrayList<>();
         String legacyId = "";
-        int totalCount = 0;
-        BigDecimal totalAmount = BigDecimal.ZERO;
         for (int rowIndex = 6; rowIndex <= worksheet.getLastRowNum(); rowIndex++) {
             Row row = worksheet.getRow(rowIndex);
             if (row == null) continue;
@@ -94,16 +94,7 @@ public class FileStorageService {
             LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
             String originatingCountry = getCellValueAsString(row.getCell(14)).trim();
 
-            // 2. Generate Hash and Check RAM
-            long rowHash = generateHash(txnNo, refNo, amount, cellB,legacyId,originatingCountry);
-
-            if (existingHashes.contains(rowHash)) {
-                continue; // SKIP: Already in DB or already seen in this file
-            }
-            // 3. Add to "Seen" and Batch
-            existingHashes.add(rowHash);
-
-            TransactionEntity txn = new TransactionEntity();
+            TransactionStagingEntity txn = new TransactionStagingEntity();
             txn.setTransactionNo(txnNo);
             txn.setReferenceNo(refNo);
             txn.setOriginatingCountry(originatingCountry);
@@ -116,25 +107,32 @@ public class FileStorageService {
             txn.setUploadedFile(uploadedFile);
             batch.add(txn);
 
-            totalCount++;
-            totalAmount = totalAmount.add(amount);
-            if (batch.size() >= 500) {
-                txnRepo.saveAll(batch);
+            if (batch.size() >= 1000) {
+                txnStagingRepo.saveAll(batch);
                 batch.clear();
             }
         }
         // 4. Final check: ensure the file is managed for the last remaining batch
         if (!batch.isEmpty()) {
-            txnRepo.saveAll(batch);
+            txnStagingRepo.saveAll(batch);
         }
-        return new FileSummary(totalCount, totalAmount);
+        // THE MAGIC STEP: Move to real table and ignore duplicates
+        txnStagingRepo.moveNewRecordsFromStaging(uploadedFile.getId());
+        // 2. Fetch the "True" summary of what was actually moved
+        Object result = txnStagingRepo.getImportedSummary(uploadedFile.getId());
+        Object[] row = (Object[]) result;
+
+        int actualCount = (row[0] != null) ? ((Number) row[0]).intValue() : 0;
+        BigDecimal actualAmount = (row[1] != null) ? (BigDecimal) row[1] : BigDecimal.ZERO;
+        // Clean up staging
+        txnStagingRepo.clearStaging(uploadedFile.getId());
+
+        return new FileSummary(actualCount, actualAmount);
     }
 
-    private FileSummary parseAndSaveSettlementFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile, Set<Long> existingHashes) throws Exception {
-        List<TransactionEntity> batch = new ArrayList<>();
+    private FileSummary parseAndSaveSettlementFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile) throws Exception {
+        List<TransactionStagingEntity> batch = new ArrayList<>();
         String legacyId = "";
-        int totalCount = 0;
-        BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (int rowIndex = 8; rowIndex <= worksheet.getLastRowNum(); rowIndex++) {
             Row row = worksheet.getRow(rowIndex);
@@ -155,15 +153,7 @@ public class FileStorageService {
                 LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
                 String originatingCountry = getCellValueAsString(row.getCell(11)).trim();
 
-                // 2. Generate Hash and Check RAM
-                long rowHash = generateHash(txnNo, refNo, amount, cellB,legacyId,originatingCountry);
-                if (existingHashes.contains(rowHash)) {
-                    continue; // SKIP: Already in DB or already seen in this file
-                }
-                // 3. Add to "Seen" and Batch
-                existingHashes.add(rowHash);
-
-                TransactionEntity txn = new TransactionEntity();
+                TransactionStagingEntity txn = new TransactionStagingEntity();
                 txn.setTransactionNo(txnNo);
                 txn.setReferenceNo(refNo);
                 txn.setOriginatingCountry(originatingCountry);
@@ -175,19 +165,29 @@ public class FileStorageService {
                 txn.setReconStatus(ReconStatus.S);
                 txn.setUploadedFile(uploadedFile);
                 batch.add(txn);
-                totalCount++;
-                totalAmount = totalAmount.add(amount);
             }
-            if (batch.size() >= 500) {
-                txnRepo.saveAll(batch);
+            if (batch.size() >= 1000) {
+                txnStagingRepo.saveAll(batch);
                 batch.clear();
             }
         }
         // 4. Final check: ensure the file is managed for the last remaining batch
         if (!batch.isEmpty()) {
-            txnRepo.saveAll(batch);
+            txnStagingRepo.saveAll(batch);
         }
-        return new FileSummary(totalCount, totalAmount);
+        // THE MAGIC STEP: Move to real table and ignore duplicates
+        txnStagingRepo.moveNewRecordsFromStaging(uploadedFile.getId());
+        // 2. Fetch the "True" summary of what was actually moved
+        Object result = txnStagingRepo.getImportedSummary(uploadedFile.getId());
+        Object[] row = (Object[]) result;
+
+        int actualCount = (row[0] != null) ? ((Number) row[0]).intValue() : 0;
+        BigDecimal actualAmount = (row[1] != null) ? (BigDecimal) row[1] : BigDecimal.ZERO;
+
+        // Clean up staging
+        txnStagingRepo.clearStaging(uploadedFile.getId());
+
+        return new FileSummary(actualCount, actualAmount);
     }
 
     private boolean isValidFormat(Sheet sheet, SourceType sourceType) {

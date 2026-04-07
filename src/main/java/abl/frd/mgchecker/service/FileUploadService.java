@@ -36,23 +36,32 @@ public class FileUploadService {
     }
 
     public String processFiles(List<MultipartFile> paymentFiles, List<MultipartFile> settlementFiles) {
-        List<String> uploaded = Collections.synchronizedList(new ArrayList<>());
-        List<String> skipped = Collections.synchronizedList(new ArrayList<>());
+        List<String> uploaded = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
         List<FileTask> tasks = new ArrayList<>();
-
-        if (paymentFiles != null) paymentFiles.stream().filter(f -> !f.isEmpty()).forEach(f -> tasks.add(new FileTask(f, SourceType.PAYMENT)));
-        if (settlementFiles != null) settlementFiles.stream().filter(f -> !f.isEmpty()).forEach(f -> tasks.add(new FileTask(f, SourceType.SETTLEMENT)));
-
-        tasks.parallelStream().forEach(task -> {
+        // 2. Collect all tasks
+        if (paymentFiles != null) {
+            paymentFiles.stream()
+                    .filter(f -> !f.isEmpty())
+                    .forEach(f -> tasks.add(new FileTask(f, SourceType.PAYMENT)));
+        }
+        if (settlementFiles != null) {
+            settlementFiles.stream()
+                    .filter(f -> !f.isEmpty())
+                    .forEach(f -> tasks.add(new FileTask(f, SourceType.SETTLEMENT)));
+        }
+        tasks.forEach(task -> {
             try {
                 String result = fileStorageService.saveSingleFileAtomic(task.file, task.sourceType);
+
                 if ("SUCCESS".equals(result)) {
                     uploaded.add(task.file.getOriginalFilename());
                 } else {
                     skipped.add("<strong>" + task.file.getOriginalFilename() + "</strong>: " + result);
                 }
             } catch (Exception e) {
-                skipped.add("<strong>" + task.file.getOriginalFilename() + "</strong>: System Error");
+                e.printStackTrace();
+                skipped.add("<strong>" + task.file.getOriginalFilename() + "</strong>: System Error - " + e.getMessage());
             }
         });
         StringBuilder msg = new StringBuilder();
@@ -69,7 +78,6 @@ public class FileUploadService {
             }
             msg.append("</ul></div>");
         }
-
         return msg.toString();
     }
     @Transactional
