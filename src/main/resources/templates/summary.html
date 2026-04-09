@@ -1,109 +1,90 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
 <head>
-  <meta charset="UTF-8">
-  <title>Process Summary | MG Checker</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; font-size: 0.85rem; }
-    .navbar { background-color: #0d2137 !important; padding: 0.5rem 2rem; }
-
-    /* Compact Search Box in Navbar */
-    .search-box {
-      border-radius: 4px;
-      border: 1px solid #cbd5e1;
-      font-size: 0.8rem;
-      width: 280px;
-      transition: all 0.2s;
-    }
-    .search-box:focus { box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25); border-color: #0d6efd; }
-
-    /* Compact Table Styling */
-    .card { border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: none; overflow: hidden; }
-    .table thead th {
-      background-color: #f1f5f9;
-      text-transform: uppercase;
-      font-size: 0.65rem;
-      font-weight: 600;
-      color: #64748b;
-      padding: 0.5rem 0.4rem;
-      border-bottom: 1px solid #e2e8f0;
-      letter-spacing: 0.025em;
-    }
-    .table tbody td { padding: 0.4rem 0.6rem; font-size: 0.8rem; border-color: #f1f5f9; }
-
-    .border-sep { border-left: 1px solid #e2e8f0 !important; }
-    .bg-light-col { background-color: #fcfdfe; }
-
-    /* Typography & Buttons */
-    .page-title { color: #0d2137; font-weight: 700; font-size: 1.25rem; }
-    .diff-text { font-weight: 600; }
-    .btn-view { font-size: 0.65rem; padding: 0.2rem 0.6rem; font-weight: 600; border-radius: 4px; }
-
-    /* Grand Total Footer */
-    .table-footer { background-color: #0d2137 !important; color: white !important; }
-    .table-footer td { padding: 0.6rem !important; font-size: 0.8rem !important; border: none !important; }
-  </style>
+  <title>RECONSOLVE | SUMMARY</title>
 </head>
 <body>
 
-<nav class="navbar navbar-dark shadow-sm">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">FRD <span class="fw-light">Reconciliation</span></a>
-    <div class="d-flex align-items-center gap-3">
-      <input type="text" id="summarySearch" class="form-control form-control-sm search-box" placeholder="Quick search date (e.g. 2024-05-20)...">
-      <a th:href="@{/files}" class="btn btn-outline-light btn-sm px-3">Home Page</a>
-      <a th:href="@{/upload-file}" class="btn btn-outline-light btn-sm px-3">New Upload</a>
-      <form th:action="@{/logout}" method="post" class="m-0">
-        <button type="submit" class="btn btn-danger btn-sm px-3">Sign Out</button>
-      </form>
+<div th:fragment="content">
+  <style>
+    /* Filter Box Styling */
+    .filter-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .form-label-custom {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      display: block;
+    }
+
+    /* Summary Card & Table */
+    .card-summary { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; overflow: hidden; }
+    .table thead th {
+      background-color: #f8fafc;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #64748b;
+      padding: 0.75rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .border-sep { border-left: 1px solid #e2e8f0 !important; }
+    .bg-discrepancy { background-color: #fdf2f2; } /* Light red tint for discrepancy columns */
+
+    .table-footer { background-color: #0f172a !important; color: white !important; }
+    .table-footer td { padding: 0.8rem !important; font-size: 0.85rem !important; font-weight: 600; }
+  </style>
+
+  <div class="page-header d-flex justify-content-between align-items-end mb-4">
+    <div>
+      <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a;">Transaction Summary</h1>
+      <p class="text-muted m-0">Aggregate reconciliation data filtered by business date.</p>
     </div>
-  </div>
-</nav>
-
-<div class="container-fluid px-lg-4 py-3">
-  <div class="mb-3">
-    <h4 class="page-title mb-0">Transaction Summary</h4>
-    <p class="text-muted small mb-0">Filtered aggregate data by business date.</p>
+    <button type="button" id="exportBtn" class="btn btn-outline-success btn-sm fw-bold shadow-sm px-3">
+      <i class="bi bi-file-earmark-excel me-1"></i> Export Report
+    </button>
   </div>
 
-  <div class="date-filter-box mb-3 p-3 bg-white border rounded shadow-sm">
-    <form th:action="@{/summary}" method="get" class="row g-2 align-items-end">
+  <div class="filter-card mb-4">
+    <form th:action="@{/summary}" method="get" class="row g-3 align-items-end">
       <div class="col-md-3">
-        <label class="form-label mb-1 fw-bold text-muted" style="font-size: 0.65rem;">START DATE</label>
+        <label class="form-label-custom">Start Date</label>
         <input type="date" name="startDate" th:value="${startDate}" class="form-control form-control-sm">
       </div>
       <div class="col-md-3">
-        <label class="form-label mb-1 fw-bold text-muted" style="font-size: 0.65rem;">END DATE</label>
+        <label class="form-label-custom">End Date</label>
         <input type="date" name="endDate" th:value="${endDate}" class="form-control form-control-sm">
       </div>
       <div class="col-md-2">
-        <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Apply</button>
+        <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Apply Filter</button>
       </div>
       <div class="col-md-2">
         <a th:href="@{/summary}" class="btn btn-outline-secondary btn-sm w-100">Reset</a>
       </div>
       <div class="col-md-2">
-        <button type="button" id="exportBtn" class="btn btn-success btn-sm px-3 fw-bold">Download Summary</button>
-      </div><!--
-      <div class="col-md-2">
-        <a th:href="@{/files}" class="btn btn-primary btn-sm w-100 fw-bold">View Uploaded Files</a>
-      </div>-->
+        <input type="text" id="summarySearch" class="form-control form-control-sm" placeholder="Quick Search...">
+      </div>
     </form>
   </div>
 
-  <div class="card">
+  <div class="card-summary shadow-sm">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0" id="summaryTable">
         <thead class="text-center">
         <tr>
-          <th rowspan="2" class="text-start ps-3 align-middle">Txn Date</th>
+          <th rowspan="2" class="text-start ps-4 align-middle">Txn Date</th>
           <th colspan="2" class="border-sep">Payment Source</th>
           <th colspan="2" class="border-sep">Settlement Source</th>
-          <th colspan="2" class="border-sep bg-light-col">Discrepancy</th>
+          <th colspan="2" class="border-sep bg-discrepancy">Discrepancy</th>
           <th rowspan="2" class="border-sep align-middle">Action</th>
         </tr>
         <tr>
@@ -111,95 +92,74 @@
           <th>Amount</th>
           <th class="border-sep">Count</th>
           <th>Amount</th>
-          <th class="border-sep bg-light-col">Diff</th>
-          <th class="bg-light-col">Amt Diff</th>
+          <th class="border-sep bg-discrepancy">Diff</th>
+          <th class="bg-discrepancy">Amt Diff</th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="row : ${summaryRows}" class="summary-row">
-          <td class="ps-3 fw-medium text-dark date-cell" th:text="${row.date}"></td>
+          <td class="ps-4 fw-bold text-dark" th:text="${row.date}"></td>
           <td class="text-center border-sep" th:text="${row.payCount}"></td>
           <td class="text-end" th:text="${#numbers.formatDecimal(row.payAmount,1,'COMMA',2,'POINT')}"></td>
           <td class="text-center border-sep" th:text="${row.setCount}"></td>
           <td class="text-end" th:text="${#numbers.formatDecimal(row.setAmount,1,'COMMA',2,'POINT')}"></td>
 
-          <td class="text-center border-sep diff-text bg-light-col"
+          <td class="text-center border-sep fw-bold bg-discrepancy"
               th:classappend="${row.txnDiff != 0 ? 'text-danger' : 'text-success'}"
               th:text="${row.txnDiff}"></td>
-          <td class="text-end diff-text bg-light-col"
+          <td class="text-end fw-bold bg-discrepancy"
               th:classappend="${row.amtDiff != 0 ? 'text-danger' : 'text-success'}"
               th:text="${#numbers.formatDecimal(row.amtDiff,1,'COMMA',2,'POINT')}"></td>
 
           <td class="text-center border-sep">
-            <a th:href="@{/result(date=${row.date})}" class="btn btn-outline-dark btn-view">View details</a>
+            <a th:href="@{/result(date=${row.date})}" class="btn btn-sm btn-outline-primary px-3 fw-bold" style="font-size: 0.7rem;">
+              DETAILS
+            </a>
           </td>
         </tr>
         <tr th:if="${#lists.isEmpty(summaryRows)}">
-          <td colspan="8" class="text-center py-4 text-muted small">No records found.</td>
+          <td colspan="8" class="text-center py-5 text-muted">No records found for selected dates.</td>
         </tr>
         </tbody>
 
         <tfoot th:if="${not #lists.isEmpty(summaryRows)}" id="summaryFooter" class="table-footer">
         <tr>
-          <td colspan="5" class="text-end fw-bold pe-3">GRAND TOTAL DISCREPANCY</td>
-          <td class="text-center fw-bold border-sep" th:text="${totalDiffCount}"></td>
-          <td class="text-end fw-bold pe-3" th:text="${#numbers.formatDecimal(totalDiffAmount,1,'COMMA',2,'POINT')}"></td>
+          <td colspan="5" class="text-end pe-4 text-uppercase" style="letter-spacing: 1px; font-size: 0.75rem;">Grand Total Discrepancy</td>
+          <td class="text-center border-sep" th:text="${totalDiffCount}"></td>
+          <td class="text-end pe-4" th:text="${#numbers.formatDecimal(totalDiffAmount,1,'COMMA',2,'POINT')}"></td>
           <td></td>
         </tr>
         </tfoot>
       </table>
     </div>
   </div>
-</div>
-<script type="text/javascript">
-  // JavaScript Search for Table Rows
-  document.getElementById('summarySearch').addEventListener('keyup', function() {
-    const query = this.value.toLowerCase();
-    const rows = document.querySelectorAll('.summary-row');
-    const footer = document.getElementById('summaryFooter');
-    let visibleCount = 0;
 
-    rows.forEach(row => {
-      // Check the Date cell and other column text
-      const content = row.innerText.toLowerCase();
-      const match = content.includes(query);
-
-      row.style.display = match ? "" : "none";
-      if (match) visibleCount++;
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    // Live Search
+    document.getElementById('summarySearch').addEventListener('keyup', function() {
+      const val = this.value.toLowerCase();
+      document.querySelectorAll('.summary-row').forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(val) ? "" : "none";
+      });
+      const footer = document.getElementById('summaryFooter');
+      if(footer) footer.style.display = val.length > 0 ? "none" : "";
     });
-    // Hide Footer if searching to prevent misleading "Grand Totals"
-    if (footer) {
-      footer.style.display = (query.length > 0) ? "none" : "";
-    }
-  });
-    // --- 2. DOWNLOAD LOGIC ---
-    document.getElementById('exportBtn').addEventListener('click', function() {
-      console.log("hello");
-      if (typeof XLSX === 'undefined') {
-        alert("Excel Library not loaded. Check internet connection.");
-        return;
-      }
-      // Get table element
-      const table = document.getElementById('summaryTable');
 
-      // Create worksheet from table
-      // 'display: true' ensures we only export what is currently filtered/visible
+    // Excel Export
+    document.getElementById('exportBtn').addEventListener('click', function() {
+      const table = document.getElementById('summaryTable');
       const ws = XLSX.utils.table_to_sheet(table, { display: true });
 
-      /* CLEANUP: Remove the "Action" column from the Excel sheet.
-         The "Action" column is the 8th column (index H).
-         We delete the 'H' key from every row in the worksheet object.
-      */
+      // Delete the 'Action' column from the export
+      Object.keys(ws).forEach(key => { if (key.startsWith('H')) delete ws[key]; });
 
-      Object.keys(ws).forEach(key => {
-        if (key.startsWith('H')) delete ws[key];
-      });
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Summary Report");
-
-      // Save File
-      XLSX.writeFile(wb, "Recon_Summary_" + new Date().toLocaleDateString() + ".xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, "Recon Summary");
+      XLSX.writeFile(wb, "Recon_Summary_" + new Date().toISOString().split('T')[0] + ".xlsx");
     });
-</script>
+  </script>
+</div>
+
 </body>
 </html>

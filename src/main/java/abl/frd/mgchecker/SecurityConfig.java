@@ -27,7 +27,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .loginPage("/login")
                 // 3. This is the POST URL that Spring Security handles automatically
                 .loginProcessingUrl("/login")
-                .defaultSuccessUrl("/", true)
+                .defaultSuccessUrl("/files", true)
                 .failureUrl("/login?error=true") // Redirect here on wrong credentials
                 .permitAll()
                 .and()
