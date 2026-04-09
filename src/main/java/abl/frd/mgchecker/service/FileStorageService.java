@@ -10,12 +10,15 @@ import abl.frd.mgchecker.model.UploadedFileEntity;
 import abl.frd.mgchecker.repository.TransactionRepository;
 import abl.frd.mgchecker.repository.TransactionStagingRepository;
 import abl.frd.mgchecker.repository.UploadedFileRepository;
+import com.github.pjfanning.xlsx.StreamingReader;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -33,16 +36,15 @@ public class FileStorageService {
     @Autowired
     private UploadedFileRepository uploadedFileRepository;
 
-    private long generateHash(String txnNo, String refNo, BigDecimal amount, String date, String legacyId, String orgCountry) {
-        String fingerprint = txnNo + "|" + refNo + "|" + amount.stripTrailingZeros().toPlainString() + "|" + date + "|" + legacyId + "|" + orgCountry;
-        // Uses Guava to create a 64-bit hash
-        return com.google.common.hash.Hashing.murmur3_128().hashString(fingerprint, StandardCharsets.UTF_8).asLong();
-    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String saveSingleFileAtomic(MultipartFile file, SourceType sourceType) {
-        try {
-            Workbook workbook = WorkbookFactory.create(file.getInputStream());
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = StreamingReader.builder()
+                     .rowCacheSize(100)    // number of rows to keep in memory (low memory footprint)
+                     .bufferSize(4096)     // buffer size used to read from input stream
+                     .open(is)) {          // opens the InputStream
+
             Sheet worksheet = workbook.getSheetAt(0);
 
             if (!isValidFormat(worksheet, sourceType)) {
@@ -63,10 +65,18 @@ public class FileStorageService {
                     ? parseAndSavePaymentFile(worksheet, sourceType, uploadedFile)
                     : parseAndSaveSettlementFile(worksheet, sourceType, uploadedFile);
 
-            uploadedFile.setTotalTransactions(summary.getTotalCount());
-            uploadedFile.setTotalAmount(summary.getTotalAmount());
-            uploadedFileRepository.save(uploadedFile);
-            return "SUCCESS";
+            if (summary.getTotalCount() > 0) {
+                uploadedFile.setTotalTransactions(summary.getTotalCount());
+                uploadedFile.setTotalAmount(summary.getTotalAmount());
+                uploadedFileRepository.save(uploadedFile);
+                return "SUCCESS";
+            } else {
+                // DELETE the file because it is empty
+                uploadedFileRepository.delete(uploadedFile);
+                // Flushing ensures the delete happens before the transaction commits
+                uploadedFileRepository.flush();
+                return "Error: The uploaded file contains no valid transactions.";
+            }
         } catch (Exception e) {
             e.printStackTrace();
             return "Error: " + e.getMessage();
@@ -76,8 +86,17 @@ public class FileStorageService {
     private FileSummary parseAndSavePaymentFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile) throws Exception {
         List<TransactionStagingEntity> batch = new ArrayList<>();
         String legacyId = "";
-        for (int rowIndex = 6; rowIndex <= worksheet.getLastRowNum(); rowIndex++) {
-            Row row = worksheet.getRow(rowIndex);
+        for (Row row : worksheet) {
+            int currentIndex = row.getRowNum();
+
+            // Skip rows until we reach start index (Row 6)
+            if (currentIndex < 6) {
+                continue;
+            }
+            // Stop if we hit a completely empty row (end of file padding)
+            if (isRowEmpty(row)) {
+                continue;
+            }
             if (row == null) continue;
             String cellB = getCellValueAsString(row.getCell(1)).trim();
             String cellC = getCellValueAsString(row.getCell(2)).trim();
@@ -134,8 +153,17 @@ public class FileStorageService {
         List<TransactionStagingEntity> batch = new ArrayList<>();
         String legacyId = "";
 
-        for (int rowIndex = 8; rowIndex <= worksheet.getLastRowNum(); rowIndex++) {
-            Row row = worksheet.getRow(rowIndex);
+        for (Row row : worksheet) {
+            int currentIndex = row.getRowNum();
+
+            // Skip rows until we reach your start index (Row 6)
+            if (currentIndex < 8) {
+                continue;
+            }
+            // 2. Stop if we hit a completely empty row (end of file padding)
+            if (isRowEmpty(row)) {
+                continue;
+            }
             if (row == null) continue;
             String cellB = getCellValueAsString(row.getCell(1)).trim();
             String cellC = getCellValueAsString(row.getCell(4)).trim();
@@ -189,13 +217,22 @@ public class FileStorageService {
 
         return new FileSummary(actualCount, actualAmount);
     }
-
-    private boolean isValidFormat(Sheet sheet, SourceType sourceType) {
-        try {
-            String probe = getCellValueAsString(sheet.getRow(3).getCell(1));
-            return (sourceType == SourceType.PAYMENT) ? probe.contains("Settlement Currency") : probe.contains("Settlement Id");
-        } catch (Exception e) { return false; }
+private boolean isValidFormat(Sheet sheet, SourceType sourceType) {
+    int targetRow = 3;
+    int current = 0;
+    for (Row row : sheet) {
+        if (current == targetRow) {
+            String probe = getCellValueAsString(row.getCell(1));
+            return (sourceType == SourceType.PAYMENT)
+                    ? probe.contains("Settlement Currency")
+                    : probe.contains("Settlement Id");
+        }
+        current++;
+        if (current > targetRow) break;
     }
+    return false;
+}
+
 
     private String getCellValueAsString(Cell cell) {
         if (cell == null) return "";
@@ -210,5 +247,16 @@ public class FileStorageService {
     private LocalDate convertStringToLocalDate(String date, String format) {
         try { return LocalDate.parse(date, DateTimeFormatter.ofPattern(format)); }
         catch (Exception e) { return null; }
+    }
+    private boolean isRowEmpty(Row row) {
+        if (row == null) return true;
+        for (int c = row.getFirstCellNum(); c < row.getLastCellNum(); c++) {
+            Cell cell = row.getCell(c);
+            // If we find even one cell with data, the row is NOT empty
+            if (cell != null && cell.getCellType() != CellType.BLANK && !getCellValueAsString(cell).trim().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 }
