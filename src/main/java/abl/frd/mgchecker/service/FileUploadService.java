@@ -124,4 +124,12 @@ public class FileUploadService {
     public List<UploadedFileEntity> findAll(){
         return uploadedFileRepository.findAll();
     }
+    public void deleteAllInBatch(){
+        // 1. Delete transactions first (they are the 'stage' data linked to files)
+        txnRepo.deleteAllInBatch();
+        reconciliationUnmatchedRepository.deleteAllInBatch();
+        reconciliationMatchedRepository.deleteAllInBatch();
+        // 2. Now you can safely delete the file records
+        uploadedFileRepository.deleteAllInBatch();
+    }
 }

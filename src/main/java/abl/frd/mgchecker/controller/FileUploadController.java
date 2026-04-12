@@ -21,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -65,6 +66,20 @@ public class FileUploadController {
         model.addAttribute("stagedPaymentFiles", paymentFiles);
         model.addAttribute("stagedSettlementFiles", settlementFiles);
         return "upload";
+    }
+    @PostMapping("/truncate-all")
+    public String truncateAll(@RequestParam("adminPassword") String password, RedirectAttributes ra) {
+        if (!"M@g#123".equals(password)) {
+            ra.addFlashAttribute("message", "Invalid Password!");
+            return "redirect:/upload-file";
+        }
+        try {
+            fileUploadService.deleteAllInBatch();
+            ra.addFlashAttribute("message", "All Data deleted successfully.");
+        } catch (Exception e) {
+            ra.addFlashAttribute("message", "deletion failed: " + e.getMessage());
+        }
+        return "redirect:/upload-file";
     }
 
     @GetMapping("/login")

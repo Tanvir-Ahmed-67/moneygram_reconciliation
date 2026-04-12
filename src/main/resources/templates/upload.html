@@ -87,8 +87,8 @@
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h6 class="fw-bold m-0 text-dark">Current Staged Files</h6>
                                     <button type="submit" class="btn btn-outline-danger btn-sm py-0" style="font-size: 0.65rem;">Delete Selected</button>
+                                    <button type="button" onclick="handleTruncate()" class="btn btn-danger btn-sm py-0" style="font-size: 0.65rem;">Truncate All</button>
                                 </div>
-
                                 <label class="form-label">Payment Source</label>
                                 <div class="file-list-box mb-3">
                                     <div th:each="file : ${stagedPaymentFiles}" class="file-item">
@@ -106,6 +106,9 @@
                                     </div>
                                     <div th:if="${#lists.isEmpty(stagedSettlementFiles)}" class="text-muted small p-2 italic">No files staged.</div>
                                 </div>
+                            </form>
+                            <form id="truncateForm" th:action="@{/truncate-all}" method="post" style="display:none;">
+                                <input type="hidden" name="adminPassword" id="adminPasswordInput">
                             </form>
                         </div>
                     </div>
@@ -156,6 +159,22 @@
             }
         });
     });
+    function handleTruncate() {
+        const pass = prompt("Enter Admin Password to WIPE ALL DATA:");
+
+        if (pass === null || pass.trim() === "") return;
+
+        if (confirm("Confirm: Delete all transactions and files permanently?")) {
+            // 1. Set the password
+            document.getElementById("adminPasswordInput").value = pass;
+
+            // 2. Manually show the loader
+            document.getElementById("loaderOverlay").style.display = "flex";
+
+            // 3. Force submit the specific form
+            document.getElementById("truncateForm").submit();
+        }
+    }
 </script>
 </body>
 </html>
