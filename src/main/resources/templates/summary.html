@@ -8,129 +8,141 @@
 
 <div th:fragment="content">
   <style>
-    /* Filter Box Styling */
+    /* 1. Header & Filter Compression */
+    .page-header h1 { font-size: 1.4rem !important; margin-bottom: 0; }
+    .page-header p { font-size: 0.75rem; }
+
     .filter-card {
-      background: white;
+      padding: 0.75rem 1.25rem; /* Tighter padding */
+      margin-bottom: 1rem !important;
+    }
+
+    /* 2. Sticky Table Header Logic */
+    .card-summary {
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 1.25rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .form-label-custom {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #64748b;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-      display: block;
+      border-radius: 8px;
+      background: #fff;
     }
 
-    /* Summary Card & Table */
-    .card-summary { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; overflow: hidden; }
     .table thead th {
-      background-color: #f8fafc;
-      text-transform: uppercase;
-      font-size: 0.65rem;
-      font-weight: 700;
-      color: #64748b;
-      padding: 0.75rem;
-      border-bottom: 1px solid #e2e8f0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #f1f5f9 !important; /* Slightly darker for contrast */
+      font-size: 0.6rem;
+      padding: 0.4rem 0.5rem !important; /* Compact header cells */
+      border-bottom: 2px solid #cbd5e1 !important;
     }
-    .border-sep { border-left: 1px solid #e2e8f0 !important; }
-    .bg-discrepancy { background-color: #fdf2f2; } /* Light red tint for discrepancy columns */
 
-    .table-footer { background-color: #0f172a !important; color: white !important; }
-    .table-footer td { padding: 0.8rem !important; font-size: 0.85rem !important; font-weight: 600; }
+    /* 3. Compact Rows */
+    .table tbody td {
+      padding: 0.4rem 0.75rem !important;
+      font-size: 0.8rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .summary-row:hover { background-color: #f8fafc; }
+
+    /* Column Width Fixes */
+    .border-sep { border-left: 1px solid #e2e8f0 !important; }
+    .bg-discrepancy { background-color: #fffafb; }
+
+    .table-footer td {
+      padding: 0.5rem 0.8rem !important;
+      font-size: 0.8rem !important;
+      border-top: 2px solid #334155;
+    }
+
+    /* Scrollbar Styling for better UX */
+    .table-responsive::-webkit-scrollbar { height: 8px; }
+    .table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
   </style>
 
-  <div class="page-header d-flex justify-content-between align-items-end mb-4">
+  <div class="page-header d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a;">Transaction Summary</h1>
-      <p class="text-muted m-0">Aggregate reconciliation data filtered by business date.</p>
+      <h1 class="fw-extrabold text-dark">Transaction Summary</h1>
+      <p class="text-muted m-0">Filtered view of reconciliation totals.</p>
     </div>
     <button type="button" id="exportBtn" class="btn btn-outline-success btn-sm fw-bold shadow-sm px-3">
-      <i class="bi bi-file-earmark-excel me-1"></i> Export Report
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Excel
     </button>
   </div>
 
-  <div class="filter-card mb-4">
-    <form th:action="@{/summary}" method="get" class="row g-3 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label-custom">Start Date</label>
+  <div class="filter-card shadow-sm">
+    <form th:action="@{/summary}" method="get" class="row gx-2 gy-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label-custom">Start</label>
         <input type="date" name="startDate" th:value="${startDate}" class="form-control form-control-sm">
       </div>
-      <div class="col-md-3">
-        <label class="form-label-custom">End Date</label>
+      <div class="col-md-2">
+        <label class="form-label-custom">End</label>
         <input type="date" name="endDate" th:value="${endDate}" class="form-control form-control-sm">
       </div>
-      <div class="col-md-2">
-        <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Apply Filter</button>
+      <div class="col-md-4 d-flex gap-1">
+        <button type="submit" class="btn btn-dark btn-sm flex-grow-1 fw-bold">Apply</button>
+        <a th:href="@{/summary}" class="btn btn-outline-secondary btn-sm flex-grow-1">Reset</a>
       </div>
-      <div class="col-md-2">
-        <a th:href="@{/summary}" class="btn btn-outline-secondary btn-sm w-100">Reset</a>
-      </div>
-      <div class="col-md-2">
-        <input type="text" id="summarySearch" class="form-control form-control-sm" placeholder="Quick Search...">
+      <div class="col-md-4">
+        <label class="form-label-custom">Quick Search</label>
+        <input type="text" id="summarySearch" class="form-control form-control-sm" placeholder="Quick find date/amount...">
       </div>
     </form>
   </div>
 
   <div class="card-summary shadow-sm">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0" id="summaryTable">
-        <thead class="text-center">
-        <tr>
-          <th rowspan="2" class="text-start ps-4 align-middle">Txn Date</th>
-          <th colspan="2" class="border-sep">Payment Source</th>
-          <th colspan="2" class="border-sep">Settlement Source</th>
-          <th colspan="2" class="border-sep bg-discrepancy">Discrepancy</th>
-          <th rowspan="2" class="border-sep align-middle">Action</th>
-        </tr>
-        <tr>
-          <th class="border-sep">Count</th>
-          <th>Amount</th>
-          <th class="border-sep">Count</th>
-          <th>Amount</th>
-          <th class="border-sep bg-discrepancy">Diff</th>
-          <th class="bg-discrepancy">Amt Diff</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="row : ${summaryRows}" class="summary-row">
-          <td class="ps-4 fw-bold text-dark" th:text="${row.date}"></td>
-          <td class="text-center border-sep" th:text="${row.payCount}"></td>
-          <td class="text-end" th:text="${#numbers.formatDecimal(row.payAmount,1,'COMMA',2,'POINT')}"></td>
-          <td class="text-center border-sep" th:text="${row.setCount}"></td>
-          <td class="text-end" th:text="${#numbers.formatDecimal(row.setAmount,1,'COMMA',2,'POINT')}"></td>
+    <div class="table-responsive" style="max-height: 70vh;"> <table class="table table-hover align-middle mb-0" id="summaryTable">
+      <thead class="text-center">
+      <tr>
+        <th rowspan="2" class="text-start ps-4 align-middle">Value Date</th>
+        <th colspan="2" class="border-sep">Payment</th>
+        <th colspan="2" class="border-sep">Settlement</th>
+        <th colspan="2" class="border-sep bg-discrepancy">Discrepancy</th>
+        <th rowspan="2" class="border-sep align-middle">Action</th>
+      </tr>
+      <tr>
+        <th class="border-sep">Qty</th>
+        <th>Amount</th>
+        <th class="border-sep">Qty</th>
+        <th>Amount</th>
+        <th class="border-sep bg-discrepancy">Diff</th>
+        <th class="bg-discrepancy">Amt Diff</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:each="row : ${summaryRows}" class="summary-row">
+        <td class="ps-4 fw-bold text-dark" th:text="${row.date}"></td>
+        <td class="text-center border-sep" th:text="${row.payCount}"></td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(row.payAmount,1,'COMMA',2,'POINT')}"></td>
+        <td class="text-center border-sep" th:text="${row.setCount}"></td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(row.setAmount,1,'COMMA',2,'POINT')}"></td>
 
-          <td class="text-center border-sep fw-bold bg-discrepancy"
-              th:classappend="${row.txnDiff != 0 ? 'text-danger' : 'text-success'}"
-              th:text="${row.txnDiff}"></td>
-          <td class="text-end fw-bold bg-discrepancy"
-              th:classappend="${row.amtDiff != 0 ? 'text-danger' : 'text-success'}"
-              th:text="${#numbers.formatDecimal(row.amtDiff,1,'COMMA',2,'POINT')}"></td>
+        <td class="text-center border-sep fw-bold bg-discrepancy"
+            th:classappend="${row.txnDiff != 0 ? 'text-danger' : 'text-success'}"
+            th:text="${row.txnDiff}"></td>
+        <td class="text-end fw-bold bg-discrepancy"
+            th:classappend="${row.amtDiff != 0 ? 'text-danger' : 'text-success'}"
+            th:text="${#numbers.formatDecimal(row.amtDiff,1,'COMMA',2,'POINT')}"></td>
 
-          <td class="text-center border-sep">
-            <a th:href="@{/result(date=${row.date})}" class="btn btn-sm btn-outline-primary px-3 fw-bold" style="font-size: 0.7rem;">
-              DETAILS
-            </a>
-          </td>
-        </tr>
-        <tr th:if="${#lists.isEmpty(summaryRows)}">
-          <td colspan="8" class="text-center py-5 text-muted">No records found for selected dates.</td>
-        </tr>
-        </tbody>
+        <td class="text-center border-sep">
+          <a th:href="@{/result(date=${row.date})}" class="btn btn-sm btn-link p-0 fw-bold text-decoration-none" style="font-size: 0.75rem;">
+            DETAILS
+          </a>
+        </td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(summaryRows)}">
+        <td colspan="8" class="text-center py-4 text-muted small">No records found.</td>
+      </tr>
+      </tbody>
 
-        <tfoot th:if="${not #lists.isEmpty(summaryRows)}" id="summaryFooter" class="table-footer">
-        <tr>
-          <td colspan="5" class="text-end pe-4 text-uppercase" style="letter-spacing: 1px; font-size: 0.75rem;">Grand Total Discrepancy</td>
-          <td class="text-center border-sep" th:text="${totalDiffCount}"></td>
-          <td class="text-end pe-4" th:text="${#numbers.formatDecimal(totalDiffAmount,1,'COMMA',2,'POINT')}"></td>
-          <td></td>
-        </tr>
-        </tfoot>
-      </table>
+      <tfoot th:if="${not #lists.isEmpty(summaryRows)}" id="summaryFooter" class="table-footer sticky-bottom">
+      <tr>
+        <td colspan="5" class="text-end pe-4 text-uppercase fw-bold" style="font-size: 0.65rem;">Grand Total Discrepancy</td>
+        <td class="text-center border-sep" th:text="${totalDiffCount}"></td>
+        <td class="text-end pe-4" th:text="${#numbers.formatDecimal(totalDiffAmount,1,'COMMA',2,'POINT')}"></td>
+        <td></td>
+      </tr>
+      </tfoot>
+    </table>
     </div>
   </div>
 
@@ -142,24 +154,18 @@
       document.querySelectorAll('.summary-row').forEach(row => {
         row.style.display = row.innerText.toLowerCase().includes(val) ? "" : "none";
       });
-      const footer = document.getElementById('summaryFooter');
-      if(footer) footer.style.display = val.length > 0 ? "none" : "";
     });
 
     // Excel Export
     document.getElementById('exportBtn').addEventListener('click', function() {
       const table = document.getElementById('summaryTable');
       const ws = XLSX.utils.table_to_sheet(table, { display: true });
-
-      // Delete the 'Action' column from the export
       Object.keys(ws).forEach(key => { if (key.startsWith('H')) delete ws[key]; });
-
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Recon Summary");
-      XLSX.writeFile(wb, "Recon_Summary_" + new Date().toISOString().split('T')[0] + ".xlsx");
+      XLSX.writeFile(wb, "Recon_Summary.xlsx");
     });
   </script>
 </div>
-
 </body>
 </html>

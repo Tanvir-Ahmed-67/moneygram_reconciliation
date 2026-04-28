@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+
+<head>
+  <title>RECONSYSTEM | Fund Input</title>
+</head>
+
+<body>
+  <div th:fragment="content">
+    <style>
+      .form-label-custom {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+        display: block;
+      }
+
+      .table thead th {
+        background-color: #f8fafc;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .num-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+    </style>
+
+    <div class="page-header mb-4">
+      <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Fund Input</h1>
+      <p class="text-muted small m-0">Select a settlement file to provide corresponding fund details.</p>
+    </div>
+
+    <div th:if="${message}" class="alert alert-info py-2 small border-0 shadow-sm mb-4" th:utext="${message}"></div>
+
+    <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3">S/N</th>
+            <th>File Name</th>
+            <th>Total Transactions</th>
+            <th class="text-center">Value Date</th>
+            <th class="text-end">Total Amount(USD)</th>
+            <th class="text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="file, stat : ${settlementFiles}">
+            <td class="ps-3 text-muted small" th:text="${stat.count}"></td>
+            <td>
+              <div class="fw-bold text-dark" style="font-size: 0.85rem;" th:text="${file.fileName}"></div>
+              <div class="text-muted" style="font-size: 0.7rem;" th:text="'ID: ' + ${file.id}"></div>
+            </td>
+            <td class="text-center small" th:text="${file.totalTransactions != null ? file.totalTransactions : 0}">
+            </td>
+            <td class="text-center small" th:text="${file.valueDate}">
+            </td>
+            <td class="text-end fw-bold small"
+              th:text="${file.totalAmountUsd != null ? #numbers.formatDecimal(file.totalAmountUsd, 1, 'COMMA', 2, 'POINT') : '0.00'}"></td>
+            <td class="text-center">
+              <button class="btn btn-primary btn-sm px-3 fw-bold" style="font-size: 0.7rem;"
+                th:data-file-id="${file.id}" th:data-file-name="${file.fileName}" onclick="openFundModal(this)">
+                <i class="bi bi-plus-circle me-1"></i> INPUT FUND
+              </button>
+            </td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(settlementFiles)}">
+            <td colspan="6" class="text-center py-5 text-muted">No processed settlement files found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal fade" id="fundModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 1rem;">
+          <div class="modal-header border-bottom-0 pb-0">
+            <h5 class="fw-bold" style="color: #0f172a;">Fund Entry</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted small mb-3">Settlement: <span id="modalFileName" class="fw-bold text-primary"></span>
+            </p>
+
+            <form id="fundInputForm" method="POST" th:action="@{/fund-submit}">
+              <input type="hidden" name="settlementFileId" id="modalFileId">
+
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label-custom">Value Date</label>
+                  <input type="date" class="form-control" name="valueDate" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Reference No.</label>
+                  <input type="text" class="form-control" name="referenceNo" placeholder="Ref#" required />
+                </div>
+              </div>
+
+              <div class="num-grid mb-3">
+                <div>
+                  <label class="form-label-custom">Amount in USD</label>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text">$</span>
+                    <input type="number" step="0.01" class="form-control" id="amountUsd" name="amountUsd"
+                      placeholder="0.00" required />
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label-custom">Conversion Rate</label>
+                  <input type="number" step="0.0001" class="form-control" id="conversionRate" name="conversionRate"
+                    placeholder="0.00" required />
+                </div>
+              </div>
+
+              <div class="mb-4 p-2"
+                style="background-color: #f8fafc; border-radius: 0.4rem; border: 1px dashed #cbd5e1;">
+                <label class="form-label-custom text-primary" style="font-size: 0.6rem;">Amount in BDT
+                  (Calculated)</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text border-0" style="background-color: #e2e8f0; font-weight: bold;">৳</span>
+                  <input type="text" class="form-control border-0" id="amountBdt" name="amountBdt" readonly
+                    style="background-color: #e2e8f0; font-weight: bold; color: #0f172a;" />
+                </div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">Submit Fund</button>
+                <button type="button" class="btn btn-outline-secondary w-50 py-2 fw-bold"
+                  data-bs-dismiss="modal">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function openFundModal(btn) {
+        const fileId = btn.getAttribute('data-file-id');
+        const fileName = btn.getAttribute('data-file-name');
+
+        document.getElementById('modalFileId').value = fileId;
+        document.getElementById('modalFileName').innerText = fileName;
+
+        const myModal = new bootstrap.Modal(document.getElementById('fundModal'));
+        myModal.show();
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const amountUsdInput = document.getElementById('amountUsd');
+        const conversionRateInput = document.getElementById('conversionRate');
+        const amountBdtInput = document.getElementById('amountBdt');
+
+        function calculateBdt() {
+          const usd = parseFloat(amountUsdInput.value) || 0;
+          const rate = parseFloat(conversionRateInput.value) || 0;
+          amountBdtInput.value = (usd * rate).toFixed(2);
+        }
+
+        amountUsdInput.addEventListener('input', calculateBdt);
+        conversionRateInput.addEventListener('input', calculateBdt);
+      });
+    </script>
+  </div>
+</body>
+
+</html>

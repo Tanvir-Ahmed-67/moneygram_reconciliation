@@ -68,6 +68,8 @@ public class FileStorageService {
             if (summary.getTotalCount() > 0) {
                 uploadedFile.setTotalTransactions(summary.getTotalCount());
                 uploadedFile.setTotalAmount(summary.getTotalAmount());
+                uploadedFile.setTotalAmountUsd(summary.getTotalAmountUsd());
+                uploadedFile.setValueDate(summary.getValueDate());
                 uploadedFileRepository.save(uploadedFile);
                 return "SUCCESS";
             } else {
@@ -118,6 +120,7 @@ public class FileStorageService {
             txn.setReferenceNo(refNo);
             txn.setOriginatingCountry(originatingCountry);
             txn.setAmount(amount);
+            txn.getAmountUsd();
             txn.setLegacyId(legacyId);
             txn.setTransactionDate(String.valueOf(paidDate));
             txn.setFileUploadDate(uploadedFile.getUploadTime());
@@ -143,19 +146,116 @@ public class FileStorageService {
 
         int actualCount = (row[0] != null) ? ((Number) row[0]).intValue() : 0;
         BigDecimal actualAmount = (row[1] != null) ? (BigDecimal) row[1] : BigDecimal.ZERO;
+        BigDecimal actualAmountUsd = (row[2] != null) ? (BigDecimal) row[2] : BigDecimal.ZERO;
         // Clean up staging
         txnStagingRepo.clearStaging(uploadedFile.getId());
 
-        return new FileSummary(actualCount, actualAmount);
+        return new FileSummary(actualCount, actualAmount, null,actualAmountUsd);
     }
-
     private FileSummary parseAndSaveSettlementFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile) throws Exception {
         List<TransactionStagingEntity> batch = new ArrayList<>();
         String legacyId = "";
+        LocalDate valueDate = null;
+        TransactionStagingEntity currentTxn = null; // Temporary holder for the paired rows
 
         for (Row row : worksheet) {
             int currentIndex = row.getRowNum();
 
+            // 1. Extract Value Date (Row 4)
+            if (currentIndex == 4) {
+                String input = getCellValueAsString(row.getCell(1));
+                String dateString = input.substring(input.indexOf(":") + 1).trim();
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+                valueDate = LocalDate.parse(dateString, formatter);
+            }
+
+            // Skip headers
+            if (currentIndex < 8) continue;
+            if (isRowEmpty(row)) continue;
+
+            String cellB = getCellValueAsString(row.getCell(1)).trim();
+            String cellC = getCellValueAsString(row.getCell(4)).trim();
+            String cellW = getCellValueAsString(row.getCell(22)).trim();
+
+            // 2. Capture Legacy ID
+            if (cellC.contains("Legacy ID :")) {
+                legacyId = getCellValueAsString(row.getCell(8)).trim();
+            }
+
+            // 3. Process TRN (Transaction Row)
+            if ("trn".equalsIgnoreCase(cellW)) {
+                String cellValueAmount = getCellValueAsString(row.getCell(23)).trim().replace("-", "");
+                BigDecimal amount = (cellValueAmount.isEmpty()) ? BigDecimal.ZERO : new BigDecimal(cellValueAmount);
+                if (amount.compareTo(BigDecimal.ZERO) == 0) continue;
+
+                String txnNo = getCellValueAsString(row.getCell(3)).trim();
+                String refNo = getCellValueAsString(row.getCell(7)).trim();
+                LocalDate paidDate = convertStringToLocalDate(cellB, "MM/dd/yyyy");
+                String originatingCountry = getCellValueAsString(row.getCell(11)).trim();
+
+                currentTxn = new TransactionStagingEntity();
+                currentTxn.setTransactionNo(txnNo);
+                currentTxn.setReferenceNo(refNo);
+                currentTxn.setOriginatingCountry(originatingCountry);
+                currentTxn.setAmount(amount);
+                currentTxn.setLegacyId(legacyId);
+                currentTxn.setTransactionDate(String.valueOf(paidDate));
+                currentTxn.setFileUploadDate(uploadedFile.getUploadTime());
+                currentTxn.setSourceType(sourceType);
+                currentTxn.setReconStatus(ReconStatus.S);
+                currentTxn.setUploadedFile(uploadedFile);
+
+                // We do NOT add to batch yet, waiting for 'stl' row
+            }
+            // 4. Process STL (Settlement Row)
+            else if ("stl".equalsIgnoreCase(cellW) && currentTxn != null) {
+                String cellValueAmountUsd = getCellValueAsString(row.getCell(23)).trim().replace("-", "");
+                BigDecimal amountUsd = (cellValueAmountUsd.isEmpty()) ? BigDecimal.ZERO : new BigDecimal(cellValueAmountUsd);
+
+                currentTxn.setAmountUsd(amountUsd); // Set the USD value
+                batch.add(currentTxn);               // Now the object is complete, add to batch
+                currentTxn = null;                   // Reset for the next transaction pair
+            }
+
+            // Batch saving logic
+            if (batch.size() >= 1000) {
+                txnStagingRepo.saveAll(batch);
+                batch.clear();
+            }
+        }
+
+        if (!batch.isEmpty()) {
+            txnStagingRepo.saveAll(batch);
+        }
+
+        // Existing repository logic...
+        txnStagingRepo.moveNewRecordsFromStaging(uploadedFile.getId());
+        Object result = txnStagingRepo.getImportedSummary(uploadedFile.getId());
+        Object[] resultRow = (Object[]) result;
+
+        int actualCount = (resultRow[0] != null) ? ((Number) resultRow[0]).intValue() : 0;
+        BigDecimal actualAmount = (resultRow[1] != null) ? (BigDecimal) resultRow[1] : BigDecimal.ZERO;
+        BigDecimal actualAmountUsd = (resultRow[2] != null) ? (BigDecimal) resultRow[2] : BigDecimal.ZERO;
+
+        txnStagingRepo.clearStaging(uploadedFile.getId());
+
+        return new FileSummary(actualCount, actualAmount, valueDate, actualAmountUsd);
+    }
+
+
+/*
+    private FileSummary parseAndSaveSettlementFile(Sheet worksheet, SourceType sourceType, UploadedFileEntity uploadedFile) throws Exception {
+        List<TransactionStagingEntity> batch = new ArrayList<>();
+        String legacyId = "";
+        LocalDate valueDate= null;
+        for (Row row : worksheet) {
+            int currentIndex = row.getRowNum();
+            if(currentIndex == 4){
+                String input = getCellValueAsString(row.getCell(1));
+                String dateString = input.substring(input.indexOf(":") + 1).trim();
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+                valueDate = LocalDate.parse(dateString, formatter);
+            }
             // Skip rows until we reach your start index (Row 6)
             if (currentIndex < 8) {
                 continue;
@@ -211,12 +311,15 @@ public class FileStorageService {
 
         int actualCount = (row[0] != null) ? ((Number) row[0]).intValue() : 0;
         BigDecimal actualAmount = (row[1] != null) ? (BigDecimal) row[1] : BigDecimal.ZERO;
+        BigDecimal actualAmountUsd = (row[2] != null) ? (BigDecimal) row[2] : BigDecimal.ZERO;
 
         // Clean up staging
         txnStagingRepo.clearStaging(uploadedFile.getId());
 
-        return new FileSummary(actualCount, actualAmount);
+        return new FileSummary(actualCount, actualAmount, valueDate, actualAmountUsd);
     }
+
+ */
 private boolean isValidFormat(Sheet sheet, SourceType sourceType) {
     int targetRow = 3;
     int current = 0;

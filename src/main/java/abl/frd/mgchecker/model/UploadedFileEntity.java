@@ -5,6 +5,7 @@ import abl.frd.mgchecker.enumpack.SourceType;
 
 import javax.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -26,6 +27,17 @@ public class UploadedFileEntity {
     @Column(name = "upload_time", nullable = false)
     private LocalDateTime uploadTime;
 
+    @Column(name = "value_date")
+    private LocalDate valueDate;
+
+    public LocalDate getValueDate() {
+        return valueDate;
+    }
+
+    public void setValueDate(LocalDate valueDate) {
+        this.valueDate = valueDate;
+    }
+
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     private FileStatus status;
@@ -36,6 +48,16 @@ public class UploadedFileEntity {
 
     @Column(precision = 18, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
+    @Column(precision = 18, scale = 2)
+    private BigDecimal totalAmountUsd = BigDecimal.ZERO;
+
+    public BigDecimal getTotalAmountUsd() {
+        return totalAmountUsd;
+    }
+
+    public void setTotalAmountUsd(BigDecimal totalAmountUsd) {
+        this.totalAmountUsd = totalAmountUsd;
+    }
 
     public int getId() {
         return id;

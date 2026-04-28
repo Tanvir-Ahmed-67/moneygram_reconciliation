@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+
+<html th:replace="~{layout :: layout(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>RECONSYSTEM | File History</title>
+</head>
+
+<body>
+    <div th:fragment="content">
+        <style>
+            .status-dot {
+                height: 8px;
+                width: 8px;
+                border-radius: 50%;
+                display: inline-block;
+                margin-right: 6px;
+            }
+
+            .bg-processed {
+                background-color: #10b981 !important;
+            }
+
+            .bg-staged {
+                background-color: #f59e0b !important;
+            }
+
+            .date-pill {
+                color: #64748b;
+                font-weight: 600;
+                font-size: 0.75rem;
+                margin-bottom: 0.5rem;
+                display: block;
+                border-left: 3px solid #cbd5e1;
+                padding-left: 8px;
+                text-transform: uppercase;
+            }
+
+            .btn-action {
+                font-size: 0.7rem;
+                padding: 0.2rem 0.6rem;
+                border-radius: 4px;
+                font-weight: 500;
+                white-space: nowrap;
+            }
+
+            .file-name-text {
+                font-weight: 500;
+                color: #1e293b;
+                font-size: 0.8rem;
+            }
+
+            .table thead th {
+                background-color: #f8fafc;
+                text-transform: uppercase;
+                font-size: 0.65rem;
+                letter-spacing: 0.025em;
+                color: #64748b;
+                font-weight: 700;
+            }
+
+            .filter-container {
+                background: white;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 1.25rem;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+            }
+        </style>
+        <header class="d-flex justify-content-between align-items-end mb-4">
+            <div>
+                <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a;">File History</h1>
+                <p class="text-muted m-0">View previously uploaded Payment and Settlement files</p>
+            </div>
+            <!--<div class="d-flex gap-2">
+                <input class="form-control form-control-sm" id="fileSearch" placeholder="Search files..." style="width: 250px;"
+                       type="text">
+                <a class="btn btn-primary btn-sm px-3 shadow-sm" style="background: #2563eb; border: none; font-weight: 600;"
+                   th:href="@{/upload-file}">+ New Upload</a>
+            </div>-->
+        </header>
+
+        <div class="alert alert-success py-2 small" th:if="${message}" th:text="${message}"></div>
+        <div class="alert alert-danger py-2 small" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+        <div class="filter-container mb-4">
+            <form th:action="@{/file-history}" method="get" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label-custom">Start Date</label>
+                    <input type="date" name="startDate" th:value="${startDate}" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label-custom">End Date</label>
+                    <input type="date" name="endDate" th:value="${endDate}" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Apply</button>
+                </div>
+                <div class="col-md-2">
+                    <a th:href="@{/file-history}" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label-custom">Quick Search</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                        <input class="form-control form-control-sm" id="fileSearch" placeholder="Search files..."
+                            style="width: 250px;" type="text">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="row g-4">
+            <div class="col-xl-6">
+                <p class="text-muted small fw-bold mb-3 text-uppercase">Payment File History</p>
+                <div class="card border-0 bg-light p-5 text-center" th:if="${#maps.isEmpty(paymentGroups)}">
+                    <p class="text-muted m-0">No payment records found.</p>
+                </div>
+                <div class="mb-4" th:each="entry : ${paymentGroups}">
+                    <span class="date-pill" th:text="${#temporals.format(entry.key, 'dd MMM yyyy')}"></span>
+                    <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 10px;">
+                        <table class="table table-sm align-middle mb-0" style="table-layout: fixed;">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 6%;">Sl</th>
+                                    <th class="ps-3" style="width: 38%;">File Name</th>
+                                    <th class="text-center" style="width: 12%;">Count</th>
+                                    <th class="text-end" style="width: 22%;">Amount</th>
+                                    <th class="text-center" style="width: 22%;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="file-row" th:each="file, fileStat : ${entry.value}">
+                                    <td class="text-center small text-muted" th:text="${fileStat.count}"></td>
+                                    <td class="ps-3 text-truncate" style="max-width: 0;" th:title="${file.fileName}">
+                                        <span class="status-dot"
+                                            th:classappend="${file.status?.name() == 'PROCESSED' ? 'bg-processed' : 'bg-staged'}"></span>
+                                        <span class="file-name-text" th:text="${file.fileName}"></span>
+                                    </td>
+                                    <td class="text-center small" th:text="${file.totalTransactions}"></td>
+                                    <td class="text-end small text-nowrap"
+                                        th:text="${#numbers.formatDecimal(file.totalAmount, 1, 'COMMA', 2, 'POINT')}">
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <a class="btn btn-outline-success btn-action"
+                                                th:href="@{'/download-file/' + ${file.id}}" title="Download File">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                            <form class="m-0" method="post"
+                                                onsubmit="return confirmDelete(event, this);"
+                                                th:action="@{'/file/delete/' + ${file.id}}">
+                                                <button class="btn btn-outline-danger btn-action" title="Delete File"
+                                                    type="submit">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <p class="text-muted small fw-bold mb-3 text-uppercase">Settlement File History</p>
+                <div class="card border-0 bg-light p-5 text-center" th:if="${#maps.isEmpty(settlementGroups)}">
+                    <p class="text-muted m-0">No Settlement records found.</p>
+                </div>
+                <div class="mb-4" th:each="entry : ${settlementGroups}">
+                    <span class="date-pill" th:text="${#temporals.format(entry.key, 'dd MMM yyyy')}"></span>
+                    <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 10px;">
+                        <table class="table table-sm align-middle mb-0" style="table-layout: fixed;">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 6%;">Sl</th>
+                                    <th class="ps-3" style="width: 38%;">File Name</th>
+                                    <th class="text-center" style="width: 12%;">Count</th>
+                                    <th class="text-end" style="width: 22%;">Amount</th>
+                                    <th class="text-center" style="width: 22%;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="file-row" th:each="file, fileStat : ${entry.value}">
+                                    <td class="text-center small text-muted" th:text="${fileStat.count}"></td>
+                                    <td class="ps-3 text-truncate" style="max-width: 0;" th:title="${file.fileName}">
+                                        <span class="status-dot"
+                                            th:classappend="${file.status?.name() == 'PROCESSED' ? 'bg-processed' : 'bg-staged'}"></span>
+                                        <span class="file-name-text" th:text="${file.fileName}"></span>
+                                    </td>
+                                    <td class="text-center small" th:text="${file.totalTransactions}"></td>
+                                    <td class="text-end small text-nowrap"
+                                        th:text="${#numbers.formatDecimal(file.totalAmount, 1, 'COMMA', 2, 'POINT')}">
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <a class="btn btn-outline-success btn-action"
+                                                th:href="@{'/download-file/' + ${file.id}}" title="Download File">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                            <form class="m-0" method="post"
+                                                onsubmit="return confirmDelete(event, this);"
+                                                th:action="@{'/file/delete/' + ${file.id}}">
+                                                <button class="btn btn-outline-danger btn-action" title="Delete File"
+                                                    type="submit">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            document.getElementById('fileSearch').addEventListener('keyup', function () {
+                let val = this.value.toLowerCase();
+
+                // 1. Loop through every date-group container
+                document.querySelectorAll('.mb-4').forEach(group => {
+                    let rows = group.querySelectorAll('.file-row');
+                    let hasVisibleRow = false;
+
+                    rows.forEach(row => {
+                        let fileName = row.querySelector('.file-name-text').textContent.toLowerCase();
+                        if (fileName.includes(val)) {
+                            row.style.display = "";
+                            hasVisibleRow = true;
+                        } else {
+                            row.style.display = "none";
+                        }
+                    });
+
+                    // 2. Hide the entire date section if no files match the search
+                    group.style.display = hasVisibleRow ? "" : "none";
+                });
+            });
+            function confirmDelete(event, formElement) {
+                event.preventDefault();
+                const firstCheck = confirm("Warning: Deleting a PROCESSED file will trigger a full re-reconciliation. Continue?");
+                if (firstCheck) {
+                    const userPassword = prompt("CRITICAL ACTION: Please enter Admin Password:");
+                    if (userPassword) {
+                        const passwordInput = document.createElement("input");
+                        passwordInput.type = "hidden";
+                        passwordInput.name = "adminPassword";
+                        passwordInput.value = userPassword;
+                        formElement.appendChild(passwordInput);
+                        formElement.submit();
+                    }
+                }
+                return false;
+            }
+        </script>
+    </div>
+</body>
+
+</html>

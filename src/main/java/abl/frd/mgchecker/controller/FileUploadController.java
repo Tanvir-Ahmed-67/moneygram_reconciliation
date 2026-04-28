@@ -4,10 +4,14 @@ import abl.frd.mgchecker.enumpack.FileStatus;
 import abl.frd.mgchecker.enumpack.ReconStatus;
 import abl.frd.mgchecker.enumpack.SourceType;
 import abl.frd.mgchecker.helper.ReconSummary;
+import abl.frd.mgchecker.model.FundEntity;
 import abl.frd.mgchecker.model.TransactionEntity;
 import abl.frd.mgchecker.model.UploadedFileEntity;
+import abl.frd.mgchecker.repository.FundRepository;
 import abl.frd.mgchecker.repository.TransactionRepository;
+import abl.frd.mgchecker.repository.UploadedFileRepository;
 import abl.frd.mgchecker.service.FileUploadService;
+import abl.frd.mgchecker.service.FundService;
 import abl.frd.mgchecker.service.ReconciliationService;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.poi.ss.usermodel.Cell;
@@ -17,6 +21,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,10 +34,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Controller
@@ -41,16 +45,26 @@ public class FileUploadController {
     private final FileUploadService fileUploadService;
     private final ReconciliationService reconciliationService;
     private final TransactionRepository txnRepo;
+    private final UploadedFileRepository uploadedFileRepository;
+    private final FundService fundService;
+    private final FundRepository fundRepository;
 
-    public FileUploadController(FileUploadService fileUploadService, TransactionRepository txnRepo, ReconciliationService reconciliationService) {
+    public FileUploadController(FileUploadService fileUploadService, TransactionRepository txnRepo,
+            ReconciliationService reconciliationService, FundService fundService,
+            UploadedFileRepository uploadedFileRepository, FundRepository fundRepository) {
         this.fileUploadService = fileUploadService;
         this.txnRepo = txnRepo;
         this.reconciliationService = reconciliationService;
+        this.fundService = fundService;
+        this.uploadedFileRepository = uploadedFileRepository;
+        this.fundRepository = fundRepository;
     }
+
     @GetMapping("/")
     public String index() {
         return "redirect:/files"; // This will make the root URL go to your Home Page
     }
+
     @GetMapping("/upload-file")
     public String showUploadPage(Model model) {
         // Fetch all files that are currently STAGED
@@ -67,10 +81,97 @@ public class FileUploadController {
         return "upload";
     }
 
+    @GetMapping("/fund-input")
+    public String showFundInputPage(Model model) {
+        List<UploadedFileEntity> settlementFiles = uploadedFileRepository.findUnmappedFilesBySourceType(SourceType.SETTLEMENT);
+        model.addAttribute("settlementFiles", settlementFiles);
+        return "fund-input";
+    }
+
+    @GetMapping("/fund-list")
+    public String showFundListPage(Model model) {
+        model.addAttribute("funds", fundService.getAllFunds());
+        return "fund-list";
+    }
+
+    @PostMapping("/fund-edit")
+    public String handleFundEdit(
+            @RequestParam("id") Integer id,
+            @RequestParam("valueDate") String valueDate,
+            @RequestParam("referenceNo") String referenceNo,
+            @RequestParam("amountUsd") BigDecimal amountUsd,
+            @RequestParam("conversionRate") BigDecimal conversionRate,
+            @RequestParam("amountBdt") BigDecimal amountBdt,
+            RedirectAttributes redirectAttributes) {
+
+        fundService.updateFund(id, valueDate, referenceNo, amountUsd, conversionRate, amountBdt);
+
+        redirectAttributes.addFlashAttribute("message",
+                "<div class='text-success mb-0'><strong>Success:</strong> Fund details updated successfully.</div>");
+        return "redirect:/fund-list";
+    }
+
+    @PostMapping("/fund-delete/{id}")
+    public String handleFundDelete(
+            @PathVariable Integer id,
+            RedirectAttributes redirectAttributes) {
+
+        fundService.deleteFund(id);
+
+        redirectAttributes.addFlashAttribute("message",
+                "<div class='text-success mb-0'><strong>Success:</strong> Fund deleted successfully.</div>");
+        return "redirect:/fund-list";
+    }
+
+    @PostMapping("/fund-submit")
+    public String handleFundSubmit(
+            @RequestParam("settlementFileId") Long fileId,
+            @RequestParam("valueDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate valueDate,
+            @RequestParam("referenceNo") String referenceNo,
+            @RequestParam("amountUsd") BigDecimal amountUsd,
+            @RequestParam("conversionRate") BigDecimal conversionRate,
+            @RequestParam("amountBdt") BigDecimal amountBdt,
+            RedirectAttributes redirectAttributes) {
+        FundEntity fund = new FundEntity();
+        fund.setValueDate(valueDate.toString());
+        fund.setReferenceNo(referenceNo);
+        fund.setAmountUsd(amountUsd);
+        fund.setConversionRate(conversionRate);
+        fund.setAmountBdt(amountBdt);
+
+        fundService.saveFund(fund);
+
+        redirectAttributes.addFlashAttribute("message",
+                "<div class='text-success mb-0'><strong>Success:</strong> Fund details for " + valueDate
+                        + " submitted successfully.</div>");
+        return "redirect:/fund-input";
+    }
+
+    @PostMapping("/truncate-all")
+    public String truncateAll(@RequestParam("adminPassword") String password, RedirectAttributes ra) {
+
+        // Replace with your actual password
+        if (!"M@g#123".equals(password)) {
+            ra.addFlashAttribute("message", "Invalid Password! Operation Aborted.");
+            return "redirect:/file-history";
+        }
+
+        try {
+            // Clear children then parents
+            fileUploadService.deleteAllInBatch();
+            ra.addFlashAttribute("message", "All tables wiped successfully.");
+        } catch (Exception e) {
+            ra.addFlashAttribute("message", "System Error:" + e.getMessage() + " ");
+        }
+        // Redirect to the GET mapping that displays the page
+        return "redirect:/file-history";
+    }
+
     @GetMapping("/login")
     public String login() {
         return "login";
     }
+
     @PostMapping("/upload")
     public String handleFileUpload(
             @RequestParam(value = "payment_file", required = false) List<MultipartFile> paymentFiles,
@@ -78,7 +179,8 @@ public class FileUploadController {
             RedirectAttributes redirectAttributes) {
         try {
             if (isFileMissing(paymentFiles) && isFileMissing(settlementFiles)) {
-                redirectAttributes.addFlashAttribute("message", "<div class='text-danger'><strong>Error: No file selected!</strong><ul class='mb-0'>");
+                redirectAttributes.addFlashAttribute("message",
+                        "<div class='text-danger'><strong>Error: No file selected!</strong><ul class='mb-0'>");
                 return "redirect:/upload-file";
             }
 
@@ -87,10 +189,12 @@ public class FileUploadController {
             redirectAttributes.addFlashAttribute("message", resultMsg);
             return "redirect:/upload-file";
         } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("message", "<div class='text-danger'><strong>System Error:</strong><ul class='mb-0'>" + e.getMessage());
+            redirectAttributes.addFlashAttribute("message",
+                    "<div class='text-danger'><strong>System Error:</strong><ul class='mb-0'>" + e.getMessage());
             return "redirect:/upload-file";
         }
     }
+
     @GetMapping("/summary")
     public String showSummary(
             @RequestParam(value = "startDate", required = false) String startDate,
@@ -104,7 +208,8 @@ public class FileUploadController {
         List<TransactionEntity> filtered = allTransactions.stream()
                 .filter(t -> t.getReconStatus() == ReconStatus.M || t.getReconStatus() == ReconStatus.U)
                 .filter(t -> t.getTransactionDate() != null)
-                .filter(t -> (startDate == null || startDate.isEmpty() || t.getTransactionDate().compareTo(startDate) >= 0))
+                .filter(t -> (startDate == null || startDate.isEmpty()
+                        || t.getTransactionDate().compareTo(startDate) >= 0))
                 .filter(t -> (endDate == null || endDate.isEmpty() || t.getTransactionDate().compareTo(endDate) <= 0))
                 .collect(Collectors.toList());
 
@@ -131,7 +236,8 @@ public class FileUploadController {
                 .sorted((a, b) -> b.getDate().compareTo(a.getDate()))
                 .collect(Collectors.toList());
 
-        // 4. Calculate Grand Totals (Calculated from summaryRows to reflect current view)
+        // 4. Calculate Grand Totals (Calculated from summaryRows to reflect current
+        // view)
         long totalDiffCount = summaryRows.stream().mapToLong(ReconSummary::getTxnDiff).sum();
         BigDecimal totalDiffAmount = summaryRows.stream()
                 .map(ReconSummary::getAmtDiff)
@@ -145,6 +251,7 @@ public class FileUploadController {
 
         return "summary";
     }
+
     @PostMapping("/process-files")
     public String processReconciliation(RedirectAttributes redirectAttributes) {
         try {
@@ -180,8 +287,10 @@ public class FileUploadController {
         else if ((startDate != null && !startDate.isEmpty()) || (endDate != null && !endDate.isEmpty())) {
             filteredData = allUnreconciled.stream()
                     .filter(t -> t.getTransactionDate() != null)
-                    .filter(t -> (startDate == null || startDate.isEmpty() || t.getTransactionDate().compareTo(startDate) >= 0))
-                    .filter(t -> (endDate == null || endDate.isEmpty() || t.getTransactionDate().compareTo(endDate) <= 0))
+                    .filter(t -> (startDate == null || startDate.isEmpty()
+                            || t.getTransactionDate().compareTo(startDate) >= 0))
+                    .filter(t -> (endDate == null || endDate.isEmpty()
+                            || t.getTransactionDate().compareTo(endDate) <= 0))
                     .collect(Collectors.toList());
 
             upToDate = (startDate != null ? startDate : "...") + " to " + (endDate != null ? endDate : "...");
@@ -209,10 +318,30 @@ public class FileUploadController {
 
         return "result";
     }
+
     @GetMapping("/files")
     public String showFilesSummary(Model model) {
-        List<UploadedFileEntity> allFiles = fileUploadService.findAll();
-        if (allFiles == null) allFiles = new ArrayList<>();
+        return "files-summary";
+    }
+
+    @GetMapping("/file-history")
+    public String showFileHistory(
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model) {
+        List<UploadedFileEntity> allFiles;
+        if (startDate != null && endDate != null) {
+            LocalDateTime startDay = startDate.atStartOfDay();
+            LocalDateTime endDay = endDate.atTime(LocalTime.MAX);
+            // Fetch only files for the selected date
+            allFiles = fileUploadService.findByUploadDate(startDay, endDay);
+        } else {
+            // Fetch all files
+            allFiles = fileUploadService.findAll();
+        }
+        // List<UploadedFileEntity> allFiles = fileUploadService.findAll();
+        if (allFiles == null)
+            allFiles = new ArrayList<>();
 
         // Grouping Payments by Date
         Map<LocalDate, List<UploadedFileEntity>> paymentGroups = allFiles.stream()
@@ -220,8 +349,7 @@ public class FileUploadController {
                 .collect(Collectors.groupingBy(
                         f -> f.getUploadTime().toLocalDate(),
                         TreeMap::new, // Keeps dates sorted
-                        Collectors.toList()
-                ));
+                        Collectors.toList()));
 
         // Grouping Settlements by Date
         Map<LocalDate, List<UploadedFileEntity>> settlementGroups = allFiles.stream()
@@ -229,14 +357,14 @@ public class FileUploadController {
                 .collect(Collectors.groupingBy(
                         f -> f.getUploadTime().toLocalDate(),
                         TreeMap::new,
-                        Collectors.toList()
-                ));
+                        Collectors.toList()));
 
         model.addAttribute("paymentGroups", paymentGroups);
         model.addAttribute("settlementGroups", settlementGroups);
 
-        return "files-summary";
+        return "file-history";
     }
+
     @GetMapping("/download-file/{id}")
     public ResponseEntity<Resource> downloadFile(@PathVariable int id) {
         // 1. Fetch the file metadata
@@ -249,13 +377,13 @@ public class FileUploadController {
         List<TransactionEntity> transactions = fileEntity.getTransactions();
 
         try (Workbook workbook = new XSSFWorkbook();
-             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             Sheet sheet = workbook.createSheet("Transactions");
 
             // Create Header Row
             Row headerRow = sheet.createRow(0);
-            String[] columns = {"Serial", "Legacy ID", "Txn No", "Date", "Country", "Ref No", "Amount"};
+            String[] columns = { "Serial", "Legacy ID", "Txn No", "Date", "Country", "Ref No", "Amount" };
             for (int i = 0; i < columns.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(columns[i]);
@@ -278,14 +406,17 @@ public class FileUploadController {
             ByteArrayResource resource = new ByteArrayResource(out.toByteArray());
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Records_" + fileEntity.getFileName() + ".xlsx")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=Records_" + fileEntity.getFileName() + ".xlsx")
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(resource);
 
         } catch (IOException e) {
             throw new RuntimeException("Fail to export data to Excel file: " + e.getMessage());
         }
     }
+
     @PostMapping("/file/delete/{id}")
     public String deleteFile(
             @PathVariable Integer id,
@@ -293,12 +424,14 @@ public class FileUploadController {
             RedirectAttributes redirectAttributes) {
         final String REQUIRED_PASSWORD = "M@g#123";
         if (!REQUIRED_PASSWORD.equals(adminPassword)) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Unauthorized: Incorrect Admin Password. Deletion failed.");
-            return "redirect:/files";
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Unauthorized: Incorrect Admin Password. Deletion failed.");
+            return "redirect:/file-history";
         }
         try {
             UploadedFileEntity file = fileUploadService.findById(id);
-            if (file == null) return "redirect:/files";
+            if (file == null)
+                return "redirect:/file-history";
             boolean wasProcessed = (file.getStatus() == FileStatus.PROCESSED);
 
             // Run the working Sequential Solution we established
@@ -313,17 +446,19 @@ public class FileUploadController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMessage", "Error during deletion: " + e.getMessage());
         }
-        return "redirect:/files";
+        return "redirect:/file-history";
     }
+
     @PostMapping("/delete-files")
     public String deleteFiles(@RequestParam(value = "fileIds", required = false) List<Integer> fileIds,
-                              RedirectAttributes redirectAttributes) {
+            RedirectAttributes redirectAttributes) {
         if (fileIds != null && !fileIds.isEmpty()) {
             fileUploadService.deleteMultipleFiles(fileIds);
             redirectAttributes.addFlashAttribute("message", "Selected files removed.");
         }
         return "redirect:/upload-file";
     }
+
     // For the Modal View (returns JSON)
     @GetMapping("/files/view/{id}")
     @ResponseBody
@@ -331,6 +466,7 @@ public class FileUploadController {
         UploadedFileEntity file = fileUploadService.findById(id);
         return file != null ? file.getTransactions() : new ArrayList<>();
     }
+
     /**
      * Helper to check if the uploaded list is truly empty or contains a blank file
      */

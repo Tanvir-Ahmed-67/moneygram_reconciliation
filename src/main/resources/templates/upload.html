@@ -63,9 +63,15 @@
           <form th:action="@{/delete-files}" method="post">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="fw-bold m-0 text-dark small">Staged Files</h6>
-              <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size: 0.65rem; padding: 2px 8px;">Clear Selected</button>
+              <div class="d-flex gap-1">
+                <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size: 0.65rem; padding: 2px 8px;">
+                  Clear Selected
+                </button>
+                <button type="button" onclick="confirmTruncate()" class="btn btn-danger btn-sm" style="font-size: 0.65rem; padding: 2px 8px;">
+                  Truncate All
+                </button>
+              </div>
             </div>
-
             <label class="form-label-custom text-primary">Payment Source</label>
             <div class="file-list-box mb-2">
               <div th:each="file : ${stagedPaymentFiles}" class="file-item">
@@ -83,6 +89,9 @@
               </div>
               <div th:if="${#lists.isEmpty(stagedSettlementFiles)}" class="text-muted small p-2 text-center mt-3">Empty</div>
             </div>
+          </form>
+          <form id="truncateForm" th:action="@{/truncate-all}" method="post" style="display:none;">
+            <input type="hidden" name="adminPassword" id="adminPasswordInput">
           </form>
         </div>
       </div>
@@ -127,6 +136,26 @@
         }
       });
     });
+    function confirmTruncate() {
+      // 1. First Layer: Password Prompt
+      const password = prompt("DANGER: This will delete ALL data from the database.\nEnter Admin Password:");
+
+      if (password === null) return; // User clicked cancel
+
+      if (password.trim() === "") {
+        alert("Password is required.");
+        return;
+      }
+
+      // 2. Second Layer: Confirmation
+      const finalCheck = confirm("Are you absolutely sure? This action cannot be undone.");
+
+      if (finalCheck) {
+        document.getElementById("adminPasswordInput").value = password;
+        document.getElementById("loaderOverlay").style.display = "flex";
+        document.getElementById("truncateForm").submit();
+      }
+    }
   </script>
 </div>
 

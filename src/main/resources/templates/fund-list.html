@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+
+<head>
+  <title>RECONSOLVE | Saved Funds</title>
+</head>
+
+<body>
+
+  <div th:fragment="content">
+    <style>
+      .form-label-custom {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+        display: block;
+      }
+
+      .table thead th {
+        background-color: #f8fafc;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+
+      .num-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+    </style>
+
+    <div class="page-header mb-4">
+      <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Saved Funds</h1>
+      <p class="text-muted small m-0">View, edit, and manage saved funds.</p>
+    </div>
+
+    <div th:if="${message}" class="alert alert-info py-2 small border-0 shadow-sm mb-4" th:utext="${message}"></div>
+
+    <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3">S/N</th>
+            <th>File Name</th>
+            <th class="text-center">Total Transaction</th>
+            <th class="text-center text-nowrap">Value Date</th>
+            <th class="text-center">Total Amount(USD)</th>
+            <th class="text-center">Total Fund(USD)</th>
+            <th class="text-center">Amount Differ(USD)</th>
+            <th class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="fund, stat : ${funds}">
+            <td class="ps-3 text-muted small" th:text="${stat.count}"></td>
+            <td>
+              <div class="fw-bold text-dark" style="font-size: 0.85rem;"
+                th:text="${fund.uploadedFile != null ? fund.uploadedFile.fileName : 'N/A'}"></div>
+            </td>
+            <td class="text-center small"
+              th:text="${fund.uploadedFile != null ? fund.uploadedFile.totalTransactions : 0}"></td>
+            <td class="text-center small text-nowrap" th:text="${fund.valueDate}"></td>
+            <td class="text-center fw-bold small"
+              th:text="${fund.uploadedFile != null and fund.uploadedFile.totalAmountUsd != null ? #numbers.formatDecimal(fund.uploadedFile.totalAmountUsd, 1, 'COMMA', 2, 'POINT') : '0.00'}">
+            </td>
+            <td class="text-center fw-bold small"
+              th:text="${fund.amountUsd != null ? #numbers.formatDecimal(fund.amountUsd, 1, 'COMMA', 2, 'POINT') : '0.00'}">
+            </td>
+            <td class="text-center fw-bold small"
+              th:with="differ=${(fund.uploadedFile != null and fund.uploadedFile.totalAmountUsd != null ? fund.uploadedFile.totalAmountUsd : 0) - (fund.amountUsd != null ? fund.amountUsd : 0)}">
+              <span th:text="${#numbers.formatDecimal(differ, 1, 'COMMA', 2, 'POINT')}"
+                th:class="${differ != 0 ? 'text-danger' : ''}"></span>
+            </td>
+            <td class="text-center">
+              <div class="d-flex justify-content-center align-items-center gap-1">
+                <button type="button" class="btn btn-primary btn-sm px-2 fw-bold" style="font-size: 0.7rem;"
+                  th:data-id="${fund.id}" th:data-valuedate="${fund.valueDate}" th:data-refno="${fund.referenceNo}"
+                  th:data-usd="${fund.amountUsd}" th:data-rate="${fund.conversionRate}" th:data-bdt="${fund.amountBdt}"
+                  onclick="openEditModal(this)">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <form th:action="@{/fund-delete/{id}(id=${fund.id})}" method="post" class="m-0 p-0"
+                  onsubmit="return confirm('Are you sure you want to delete this fund?');">
+                  <button type="submit" class="btn btn-outline-danger btn-sm px-2 fw-bold" style="font-size: 0.7rem;">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(funds)}">
+            <td colspan="8" class="text-center py-5 text-muted">No funds saved yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal fade" id="editFundModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content" style="border-radius: 1rem; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+          <form method="POST" th:action="@{/fund-edit}">
+            <div class="modal-header border-bottom-0 pb-0">
+              <h5 class="modal-title fw-bold" style="color: #0f172a;">Edit Fund</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3">
+              <input type="hidden" id="editFundId" name="id" />
+              <div class="mb-3">
+                <label class="form-label-custom">Value Date</label>
+                <input type="date" class="form-control" id="editValueDate" name="valueDate" required />
+              </div>
+              <div class="mb-3">
+                <label class="form-label-custom">Reference No.</label>
+                <input type="text" class="form-control" id="editRefNo" name="referenceNo" required />
+              </div>
+              <div class="mb-3">
+                <label class="form-label-custom">Amount in USD</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-white border-end-0">$</span>
+                  <input type="number" step="0.01" class="form-control border-start-0 ps-0" id="editAmountUsd"
+                    name="amountUsd" required />
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label-custom">Conversion Rate</label>
+                <input type="number" step="0.0001" class="form-control" id="editRate" name="conversionRate" required />
+              </div>
+              <div class="mb-3 p-3"
+                style="background-color: #f8fafc; border-radius: 0.5rem; border: 1px dashed #cbd5e1;">
+                <label class="form-label-custom text-primary">Amount in BDT</label>
+                <div class="input-group">
+                  <span class="input-group-text border-0" style="background-color: #e2e8f0; font-weight: bold;">৳</span>
+                  <input type="text" class="form-control border-0" id="editAmountBdt" name="amountBdt" readonly
+                    style="background-color: #e2e8f0; font-weight: bold; color: #0f172a;" />
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"
+                style="font-weight: 600;">Cancel</button>
+              <button type="submit" class="btn btn-primary shadow-sm" style="font-weight: 600;">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        // Edit Form Calc
+        const editAmountUsdInput = document.getElementById('editAmountUsd');
+        const editRateInput = document.getElementById('editRate');
+        const editAmountBdtInput = document.getElementById('editAmountBdt');
+
+        function calculateEditBdt() {
+          const usd = parseFloat(editAmountUsdInput.value) || 0;
+          const rate = parseFloat(editRateInput.value) || 0;
+          const bdt = (usd * rate).toFixed(2);
+          editAmountBdtInput.value = bdt > 0 ? bdt : '';
+        }
+
+        editAmountUsdInput.addEventListener('input', calculateEditBdt);
+        editRateInput.addEventListener('input', calculateEditBdt);
+      });
+
+      function openEditModal(button) {
+        document.getElementById('editFundId').value = button.getAttribute('data-id');
+        document.getElementById('editValueDate').value = button.getAttribute('data-valuedate');
+        document.getElementById('editRefNo').value = button.getAttribute('data-refno');
+        document.getElementById('editAmountUsd').value = button.getAttribute('data-usd');
+        document.getElementById('editRate').value = button.getAttribute('data-rate');
+        document.getElementById('editAmountBdt').value = button.getAttribute('data-bdt');
+
+        var editModal = new bootstrap.Modal(document.getElementById('editFundModal'));
+        editModal.show();
+      }
+    </script>
+  </div>
+
+</body>
+
+</html>

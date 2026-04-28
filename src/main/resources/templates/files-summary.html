@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout :: layout(~{::content})}">
 <head>
-    <title>RECONSOLVE | Dashboard</title>
+    <title>RECONSYSTEM | Dashboard</title>
 </head>
 <body>
 
@@ -22,10 +22,6 @@
         <div>
             <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a;">Dashboard</h1>
             <p class="text-muted m-0">Monitoring variance for <strong>MoneyGram</strong></p>
-        </div>
-        <div class="d-flex gap-2">
-            <input type="text" id="fileSearch" class="form-control form-control-sm" style="width: 250px;" placeholder="Search files...">
-            <a th:href="@{/upload-file}" class="btn btn-primary btn-sm px-3 shadow-sm" style="background: #2563eb; border: none; font-weight: 600;">+ New Upload</a>
         </div>
     </header>
 
@@ -63,129 +59,6 @@
     <div th:if="${message}" class="alert alert-success py-2 small" th:text="${message}"></div>
     <div th:if="${errorMessage}" class="alert alert-danger py-2 small" th:text="${errorMessage}"></div>
 
-    <div class="row g-4">
-        <div class="col-xl-6">
-            <p class="text-muted small fw-bold mb-3 text-uppercase">Payment File History</p>
-            <div th:if="${#maps.isEmpty(paymentGroups)}" class="card border-0 bg-light p-5 text-center">
-                <p class="text-muted m-0">No payment records found.</p>
-            </div>
-
-            <div th:each="entry : ${paymentGroups}" class="mb-4">
-                <span class="date-pill" th:text="${#temporals.format(entry.key, 'dd MMM yyyy')}"></span>
-                <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 10px;">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead>
-                        <tr>
-                            <th class="ps-3" style="width: 40%;">File Name</th>
-                            <th class="text-center" style="width: 15%;">Count</th>
-                            <th class="text-end" style="width: 20%;">Amount</th>
-                            <th class="text-center" style="width: 25%;">Actions</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="file : ${entry.value}" class="file-row">
-                            <td class="ps-3">
-                                <span class="status-dot" th:classappend="${file.status?.name() == 'PROCESSED' ? 'bg-processed' : 'bg-staged'}"></span>
-                                <span class="file-name-text" th:text="${file.fileName}"></span>
-                            </td>
-                            <td class="text-center small" th:text="${file.totalTransactions}"></td>
-                            <td class="text-end small fw-bold" th:text="${#numbers.formatDecimal(file.totalAmount, 1, 'COMMA', 2, 'POINT')}"></td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a th:href="@{'/download-file/' + ${file.id}}"
-                                       class="btn btn-outline-success btn-action"
-                                       title="Download File">
-                                        <i class="bi bi-download"></i>
-                                    </a>
-
-                                    <form th:action="@{'/file/delete/' + ${file.id}}" method="post" class="m-0" onsubmit="return confirmDelete(event, this);">
-                                        <button type="submit"
-                                                class="btn btn-outline-danger btn-action"
-                                                title="Delete File">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-6">
-            <p class="text-muted small fw-bold mb-3 text-uppercase">Settlement File History</p>
-            <div th:each="entry : ${settlementGroups}" class="mb-4">
-                <span class="date-pill" th:text="${#temporals.format(entry.key, 'dd MMM yyyy')}"></span>
-                <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 10px;">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead>
-                        <tr>
-                            <th class="ps-3" style="width: 40%;">File Name</th>
-                            <th class="text-center" style="width: 15%;">Count</th>
-                            <th class="text-end" style="width: 20%;">Amount</th>
-                            <th class="text-center" style="width: 25%;">Actions</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="file : ${entry.value}" class="file-row">
-                            <td class="ps-3">
-                                <span class="status-dot" th:classappend="${file.status?.name() == 'PROCESSED' ? 'bg-processed' : 'bg-staged'}"></span>
-                                <span class="file-name-text" th:text="${file.fileName}"></span>
-                            </td>
-                            <td class="text-center small" th:text="${file.totalTransactions}"></td>
-                            <td class="text-end small fw-bold" th:text="${#numbers.formatDecimal(file.totalAmount, 1, 'COMMA', 2, 'POINT')}"></td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a th:href="@{'/download-file/' + ${file.id}}"
-                                       class="btn btn-outline-success btn-action"
-                                       title="Download File">
-                                        <i class="bi bi-download"></i>
-                                    </a>
-                                    <form th:action="@{'/file/delete/' + ${file.id}}" method="post" class="m-0" onsubmit="return confirmDelete(event, this);">
-                                        <button type="submit"
-                                                class="btn btn-outline-danger btn-action"
-                                                title="Delete File">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        document.getElementById('fileSearch').addEventListener('keyup', function() {
-            let val = this.value.toLowerCase();
-            document.querySelectorAll('.file-row').forEach(row => {
-                let name = row.querySelector('.file-name-text').textContent.toLowerCase();
-                row.style.display = name.includes(val) ? "" : "none";
-            });
-        });
-
-        function confirmDelete(event, formElement) {
-            event.preventDefault();
-            const firstCheck = confirm("Warning: Deleting a PROCESSED file will trigger a full re-reconciliation. Continue?");
-            if (firstCheck) {
-                const userPassword = prompt("CRITICAL ACTION: Please enter Admin Password:");
-                if (userPassword) {
-                    const passwordInput = document.createElement("input");
-                    passwordInput.type = "hidden";
-                    passwordInput.name = "adminPassword";
-                    passwordInput.value = userPassword;
-                    formElement.appendChild(passwordInput);
-                    formElement.submit();
-                }
-            }
-            return false;
-        }
-    </script>
 </div>
 </body>
 </html>

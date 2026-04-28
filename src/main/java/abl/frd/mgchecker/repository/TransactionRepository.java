@@ -55,4 +55,7 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     @Modifying
     @Query(value = "DELETE FROM transaction WHERE file_id = :fId", nativeQuery = true)
     void deleteByFileIdNative(@Param("fId") Integer fId);
+    
+    @Query(value = "SELECT file_id FROM transaction WHERE transaction_date = :txnDate AND source_type = 'SETTLEMENT' LIMIT 1", nativeQuery = true)
+    Integer findSettlementFileIdByDate(@Param("txnDate") String txnDate);
 }

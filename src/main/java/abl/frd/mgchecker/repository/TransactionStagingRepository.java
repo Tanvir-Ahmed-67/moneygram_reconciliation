@@ -16,13 +16,13 @@ public interface TransactionStagingRepository extends JpaRepository<TransactionS
     @Modifying
     @Transactional
     @Query(value = "INSERT IGNORE INTO transaction " +
-            "(transaction_no, reference_no, org_country, amount, transaction_date, " +
+            "(transaction_no, reference_no, org_country, amount,amount_usd, transaction_date, " +
             "file_upload_date, legacy_id, source_type, recon_status, file_id) " +
-            "SELECT transaction_no, reference_no, org_country, amount, transaction_date, " +
+            "SELECT transaction_no, reference_no, org_country, amount, amount_usd, transaction_date, " +
             "file_upload_date, legacy_id, source_type, recon_status, file_id " +
             "FROM transaction_staging_entity WHERE file_id = :fileId", nativeQuery = true)
     void moveNewRecordsFromStaging(@Param("fileId") int fileId);
-    @Query(value = "SELECT COUNT(*), SUM(s.amount) FROM transaction_staging_entity s " +
+    @Query(value = "SELECT COUNT(*), SUM(s.amount), SUM(s.amount_usd) FROM transaction_staging_entity s " +
             "JOIN transaction t ON s.transaction_no = t.transaction_no " +
             "AND s.reference_no = t.reference_no " +
             "AND s.amount = t.amount " +

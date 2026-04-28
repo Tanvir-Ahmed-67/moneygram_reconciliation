@@ -22,6 +22,8 @@ public class TransactionStagingEntity {
 
     @Column(name = "amount", precision = 18, scale = 2, nullable = false)
     private BigDecimal amount;
+    @Column(name = "amount_usd", precision = 18, scale = 2, nullable = false)
+    private BigDecimal amountUsd = BigDecimal.ZERO;
     @Column(name = "transaction_date", length=30)
     private String transactionDate;
 
@@ -41,6 +43,14 @@ public class TransactionStagingEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "file_id", nullable = false)
     private UploadedFileEntity uploadedFile;
+
+    public BigDecimal getAmountUsd() {
+        return amountUsd;
+    }
+
+    public void setAmountUsd(BigDecimal amountUsd) {
+        this.amountUsd = amountUsd;
+    }
 
     public int getId() {
         return id;
