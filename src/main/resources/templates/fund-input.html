@@ -30,10 +30,12 @@
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
       }
+      .source-payment { background-color: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
+      .source-settlement { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
     </style>
 
     <div class="page-header mb-4">
-      <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Fund Input</h1>
+      <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Fund Input for Settlement Files</h1>
       <p class="text-muted small m-0">Select a settlement file to provide corresponding fund details.</p>
     </div>
 
@@ -44,9 +46,9 @@
         <thead>
           <tr>
             <th class="ps-3">S/N</th>
-            <th>File Name</th>
-            <th>Total Transactions</th>
             <th class="text-center">Value Date</th>
+            <th class="text-center">File Type</th>
+            <th class="text-center">Total Transactions</th>
             <th class="text-end">Total Amount(USD)</th>
             <th class="text-center">Action</th>
           </tr>
@@ -54,19 +56,17 @@
         <tbody>
           <tr th:each="file, stat : ${settlementFiles}">
             <td class="ps-3 text-muted small" th:text="${stat.count}"></td>
-            <td>
-              <div class="fw-bold text-dark" style="font-size: 0.85rem;" th:text="${file.fileName}"></div>
-              <div class="text-muted" style="font-size: 0.7rem;" th:text="'ID: ' + ${file.id}"></div>
+            <td class="text-center small">
+              <div class="fw-bold text-dark" style="font-size: 0.85rem;" th:text="${file.valueDate}"></div>
             </td>
+            <td class="text-center small"><span th:text="${file.sourceType}" th:classappend="${file.sourceType.name() == 'PAYMENT' ? 'source-payment' : 'source-settlement'}" class="badge-source"></span></td>
             <td class="text-center small" th:text="${file.totalTransactions != null ? file.totalTransactions : 0}">
-            </td>
-            <td class="text-center small" th:text="${file.valueDate}">
             </td>
             <td class="text-end fw-bold small"
               th:text="${file.totalAmountUsd != null ? #numbers.formatDecimal(file.totalAmountUsd, 1, 'COMMA', 2, 'POINT') : '0.00'}"></td>
             <td class="text-center">
               <button class="btn btn-primary btn-sm px-3 fw-bold" style="font-size: 0.7rem;"
-                th:data-file-id="${file.id}" th:data-file-name="${file.fileName}" onclick="openFundModal(this)">
+                th:data-file-id="${file.id}" th:data-file-name="${file.fileName}" th:data-value-date="${file.valueDate}" onclick="openFundModal(this)">
                 <i class="bi bi-plus-circle me-1"></i> INPUT FUND
               </button>
             </td>
@@ -86,18 +86,15 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p class="text-muted small mb-3">Settlement: <span id="modalFileName" class="fw-bold text-primary"></span>
-            </p>
+            <p class="text-muted small mb-3">Settlement File: <span id="modalFileName" class="fw-bold text-primary"></span></p>
+            <p class="text-muted small mb-3">Value Date: <span id="displayValueDate" class="fw-bold text-dark"></span></p>
 
             <form id="fundInputForm" method="POST" th:action="@{/fund-submit}">
               <input type="hidden" name="settlementFileId" id="modalFileId">
+              <input type="hidden" name="valueDate" id="modalValueDate"/>
 
               <div class="row g-2 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label-custom">Value Date</label>
-                  <input type="date" class="form-control" name="valueDate" required />
-                </div>
-                <div class="col-md-6">
+                <div class="col-md-12">
                   <label class="form-label-custom">Reference No.</label>
                   <input type="text" class="form-control" name="referenceNo" placeholder="Ref#" required />
                 </div>
@@ -145,9 +142,14 @@
       function openFundModal(btn) {
         const fileId = btn.getAttribute('data-file-id');
         const fileName = btn.getAttribute('data-file-name');
+        const valueDate = btn.getAttribute('data-value-date'); // Grab the date
 
         document.getElementById('modalFileId').value = fileId;
         document.getElementById('modalFileName').innerText = fileName;
+
+        // Set the date in both the hidden input and the display span
+        document.getElementById('modalValueDate').value = valueDate;
+        document.getElementById('displayValueDate').innerText = valueDate;
 
         const myModal = new bootstrap.Modal(document.getElementById('fundModal'));
         myModal.show();

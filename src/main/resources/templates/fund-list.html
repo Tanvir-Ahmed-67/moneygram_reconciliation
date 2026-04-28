@@ -34,7 +34,7 @@
     </style>
 
     <div class="page-header mb-4">
-      <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Saved Funds</h1>
+      <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Saved Funds for Settlement File</h1>
       <p class="text-muted small m-0">View, edit, and manage saved funds.</p>
     </div>
 
@@ -45,11 +45,10 @@
         <thead>
           <tr>
             <th class="ps-3">S/N</th>
-            <th>File Name</th>
-            <th class="text-center">Total Transaction</th>
             <th class="text-center text-nowrap">Value Date</th>
+            <th class="text-center">Total Transaction</th>
             <th class="text-center">Total Amount(USD)</th>
-            <th class="text-center">Total Fund(USD)</th>
+            <th class="text-center">Input Fund(USD)</th>
             <th class="text-center">Amount Differ(USD)</th>
             <th class="text-center">Actions</th>
           </tr>
@@ -57,13 +56,9 @@
         <tbody>
           <tr th:each="fund, stat : ${funds}">
             <td class="ps-3 text-muted small" th:text="${stat.count}"></td>
-            <td>
-              <div class="fw-bold text-dark" style="font-size: 0.85rem;"
-                th:text="${fund.uploadedFile != null ? fund.uploadedFile.fileName : 'N/A'}"></div>
-            </td>
+            <td class="text-center small text-nowrap" th:text="${fund.valueDate}"></td>
             <td class="text-center small"
               th:text="${fund.uploadedFile != null ? fund.uploadedFile.totalTransactions : 0}"></td>
-            <td class="text-center small text-nowrap" th:text="${fund.valueDate}"></td>
             <td class="text-center fw-bold small"
               th:text="${fund.uploadedFile != null and fund.uploadedFile.totalAmountUsd != null ? #numbers.formatDecimal(fund.uploadedFile.totalAmountUsd, 1, 'COMMA', 2, 'POINT') : '0.00'}">
             </td>
