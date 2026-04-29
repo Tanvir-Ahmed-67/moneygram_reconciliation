@@ -46,6 +46,10 @@ public class FundService {
         return fundRepository.findAll();
     }
 
+    public List<FundEntity> getFundsByDateRange(String startDate, String endDate) {
+        return fundRepository.findFundsByDateRange(startDate, endDate);
+    }
+
     public FundEntity getFundById(Integer id) {
         return fundRepository.findById(id).orElse(null);
     }

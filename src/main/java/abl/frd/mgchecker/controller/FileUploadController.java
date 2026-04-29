@@ -89,8 +89,19 @@ public class FileUploadController {
     }
 
     @GetMapping("/fund-list")
-    public String showFundListPage(Model model) {
-        model.addAttribute("funds", fundService.getAllFunds());
+    public String showFundListPage(
+            @RequestParam(value = "startDate", required = false) String startDate,
+            @RequestParam(value = "endDate", required = false) String endDate,
+            Model model) {
+        List<FundEntity> funds;
+        if (startDate != null && !startDate.isEmpty() && endDate != null && !endDate.isEmpty()) {
+            funds = fundService.getFundsByDateRange(startDate, endDate);
+        } else {
+            funds = fundService.getAllFunds();
+        }
+        model.addAttribute("funds", funds);
+        model.addAttribute("startDate", startDate);
+        model.addAttribute("endDate", endDate);
         return "fund-list";
     }
 

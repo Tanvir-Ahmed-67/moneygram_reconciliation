@@ -31,17 +31,51 @@
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
       }
+      .filter-container { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     </style>
 
-    <div class="page-header mb-4">
-      <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Saved Funds for Settlement File</h1>
-      <p class="text-muted small m-0">View, edit, and manage saved funds.</p>
+    <div class="page-header d-flex justify-content-between align-items-end mb-4">
+      <div>
+        <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">Saved Funds for Settlement File</h1>
+        <p class="text-muted small m-0">View, edit, and manage saved funds.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <button id="exportExcel" class="btn btn-outline-success btn-sm fw-bold shadow-sm px-3">
+          <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Excel
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-container mb-4">
+      <form th:action="@{/fund-list}" method="get" class="row g-3 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label-custom">Start Date</label>
+          <input type="date" name="startDate" th:value="${startDate}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label-custom">End Date</label>
+          <input type="date" name="endDate" th:value="${endDate}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Apply</button>
+        </div>
+        <div class="col-md-2">
+          <a th:href="@{/fund-list}" class="btn btn-outline-secondary btn-sm w-100">Reset</a>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label-custom">Quick Search</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+            <input type="text" id="tableSearch" class="form-control border-start-0" placeholder="Quick Search...">
+          </div>
+        </div>
+      </form>
     </div>
 
     <div th:if="${message}" class="alert alert-info py-2 small border-0 shadow-sm mb-4" th:utext="${message}"></div>
 
     <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
-      <table class="table table-hover align-middle mb-0">
+      <table id="fundTable" class="table table-hover align-middle mb-0">
         <thead>
           <tr>
             <th class="ps-3">S/N</th>
@@ -54,7 +88,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr th:each="fund, stat : ${funds}">
+        <tr th:each="fund, stat : ${funds}" class="fund-row">
             <td class="ps-3 text-muted small" th:text="${stat.count}"></td>
             <td class="text-center small text-nowrap" th:text="${fund.valueDate}"></td>
             <td class="text-center small"
@@ -174,6 +208,25 @@
         var editModal = new bootstrap.Modal(document.getElementById('editFundModal'));
         editModal.show();
       }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+      // Live Filter Function
+      document.getElementById('tableSearch').addEventListener('keyup', function() {
+        const val = this.value.toLowerCase();
+        const rows = document.querySelectorAll('.fund-row');
+        rows.forEach(row => {
+          row.style.display = row.innerText.toLowerCase().includes(val) ? "" : "none";
+        });
+      });
+
+      // Excel Export
+      document.getElementById('exportExcel').addEventListener('click', function() {
+        const table = document.getElementById('fundTable');
+        const wb = XLSX.utils.table_to_book(table, { sheet: "Saved_Funds_Report" });
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(wb, "Saved_Funds_Report_" + dateStr + ".xlsx");
+      });
     </script>
   </div>
 
