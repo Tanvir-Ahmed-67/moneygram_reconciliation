@@ -165,6 +165,12 @@ public class FileStorageService {
             if (currentIndex == 4) {
                 String input = getCellValueAsString(row.getCell(1));
                 String dateString = input.substring(input.indexOf(":") + 1).trim();
+                // 1. Check if it's a range (contains " to ")
+                if (dateString.contains(" to ")) {
+                    // Split by " to " and take the second part (index 1)
+                    String[] parts = dateString.split(" to ");
+                    dateString = parts[1].trim();
+                }
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
                 valueDate = LocalDate.parse(dateString, formatter);
             }
