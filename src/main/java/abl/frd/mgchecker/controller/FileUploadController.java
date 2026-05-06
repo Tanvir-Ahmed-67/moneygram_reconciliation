@@ -99,9 +99,21 @@ public class FileUploadController {
         } else {
             funds = fundService.getAllFunds();
         }
+        
+        java.math.BigDecimal totalDiffer = funds.stream()
+            .map(fund -> {
+                java.math.BigDecimal uploadedTotal = (fund.getUploadedFile() != null && fund.getUploadedFile().getTotalAmountUsd() != null)
+                        ? fund.getUploadedFile().getTotalAmountUsd()
+                        : java.math.BigDecimal.ZERO;
+                java.math.BigDecimal fundUsd = fund.getAmountUsd() != null ? fund.getAmountUsd() : java.math.BigDecimal.ZERO;
+                return fundUsd.subtract(uploadedTotal);
+            })
+            .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
         model.addAttribute("funds", funds);
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);
+        model.addAttribute("totalDiffer", totalDiffer);
         return "fund-list";
     }
 

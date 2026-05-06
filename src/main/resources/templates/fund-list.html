@@ -32,6 +32,8 @@
         gap: 1rem;
       }
       .filter-container { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+      .total-footer { background-color: #0f172a !important; color: white !important; }
+      .total-footer td { padding: 0.75rem !important; font-size: 0.85rem !important; font-weight: 700; border: none !important; }
     </style>
 
     <div class="page-header d-flex justify-content-between align-items-end mb-4">
@@ -100,7 +102,7 @@
               th:text="${fund.amountUsd != null ? #numbers.formatDecimal(fund.amountUsd, 1, 'COMMA', 2, 'POINT') : '0.00'}">
             </td>
             <td class="text-center fw-bold small"
-              th:with="differ=${(fund.uploadedFile != null and fund.uploadedFile.totalAmountUsd != null ? fund.uploadedFile.totalAmountUsd : 0) - (fund.amountUsd != null ? fund.amountUsd : 0)}">
+              th:with="differ=${(fund.amountUsd != null ? fund.amountUsd : 0) - (fund.uploadedFile != null and fund.uploadedFile.totalAmountUsd != null ? fund.uploadedFile.totalAmountUsd : 0)}">
               <span th:text="${#numbers.formatDecimal(differ, 1, 'COMMA', 2, 'POINT')}"
                 th:class="${differ != 0 ? 'text-danger' : ''}"></span>
             </td>
@@ -122,9 +124,17 @@
             </td>
           </tr>
           <tr th:if="${#lists.isEmpty(funds)}">
-            <td colspan="8" class="text-center py-5 text-muted">No funds saved yet.</td>
+            <td colspan="7" class="text-center py-5 text-muted">No funds saved yet.</td>
           </tr>
         </tbody>
+        <tfoot class="total-footer" th:if="${not #lists.isEmpty(funds)}">
+          <tr>
+            <td colspan="5" class="text-end pe-4 text-uppercase" style="letter-spacing: 1px; font-size: 0.7rem;">Grand Total Differ</td>
+            <td class="text-center" th:text="${#numbers.formatDecimal(totalDiffer, 1, 'COMMA', 2, 'POINT')}"
+                th:classappend="${totalDiffer != 0 ? 'text-danger' : ''}"></td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
 
