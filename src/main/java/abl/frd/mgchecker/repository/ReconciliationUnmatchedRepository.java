@@ -17,4 +17,10 @@ public interface ReconciliationUnmatchedRepository extends JpaRepository<Reconci
     @Modifying
     @Query(value = "DELETE FROM reconciliation_unmatched WHERE file_id = :fId", nativeQuery = true)
     void deleteByFileIdNative(@Param("fId") Integer fId);
+
+    @Query(value = "SELECT COUNT(*) FROM reconciliation_unmatched", nativeQuery = true)
+    Long countTotalUnreconciled();
+
+    @Query(value = "SELECT SUM(t.amount) FROM transaction t JOIN reconciliation_unmatched r ON t.id = r.transaction_id", nativeQuery = true)
+    java.math.BigDecimal sumTotalUnreconciledAmount();
 }

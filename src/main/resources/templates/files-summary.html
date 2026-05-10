@@ -1,64 +1,218 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{layout :: layout(~{::content})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+
 <head>
     <title>RECONSYSTEM | Dashboard</title>
 </head>
+
 <body>
 
-<div th:fragment="content">
-    <style>
-        .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-        .bg-processed { background-color: #10b981 !important; }
-        .bg-staged { background-color: #f59e0b !important; }
-        .bg-pending { background-color: #3b82f6 !important; }
-        .date-pill { color: #64748b; font-weight: 600; font-size: 0.75rem; margin-bottom: 0.5rem; display: block; border-left: 3px solid #cbd5e1; padding-left: 8px; text-transform: uppercase; }
-        .btn-action { font-size: 0.7rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-        .file-name-text { font-weight: 500; color: #1e293b; font-size: 0.8rem; }
-        .table thead th { background-color: #f8fafc; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.025em; color: #64748b; font-weight: 700; }
-    </style>
+    <div th:fragment="content">
+        <style>
+            .stats-card {
+                background: white;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 1rem;
+                transition: all 0.3s ease;
+                position: relative;
+                overflow: hidden;
+                height: 100%;
+            }
 
-    <header class="d-flex justify-content-between align-items-end mb-4">
-        <div>
-            <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a;">Dashboard</h1>
-            <p class="text-muted m-0">Monitoring variance for <strong>MoneyGram</strong></p>
-        </div>
-    </header>
+            .stats-card:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            }
 
-    <div class="row g-3 mb-5">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm p-4" style="border-top: 4px solid #ef4444 !important; border-radius: 12px;">
-                <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">Variance Gap</span>
-                <div class="h3 fw-black my-2" style="font-weight: 800; color: #0f172a;">$8,240.50</div>
-                <span class="small fw-bold" style="color: #ef4444;">● High Severity</span>
+            .stats-icon-wrapper {
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 0.75rem;
+                font-size: 1.1rem;
+            }
+
+            .stats-label {
+                font-size: 0.65rem;
+                font-weight: 700;
+                color: #64748b;
+                text-transform: uppercase;
+                letter-spacing: 0.025em;
+                margin-bottom: 0.25rem;
+            }
+
+            .stats-value {
+                font-size: 1.25rem;
+                font-weight: 800;
+                color: #0f172a;
+                margin-bottom: 0.4rem;
+                letter-spacing: -0.01em;
+            }
+
+            .stats-footer {
+                font-size: 0.65rem;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .card-indigo {
+                border-bottom: 3px solid #6366f1;
+            }
+
+            .icon-indigo {
+                background: #eef2ff;
+                color: #6366f1;
+            }
+
+            .card-rose {
+                border-bottom: 3px solid #f43f5e;
+            }
+
+            .icon-rose {
+                background: #fff1f2;
+                color: #f43f5e;
+            }
+
+            .card-amber {
+                border-bottom: 3px solid #f59e0b;
+            }
+
+            .icon-amber {
+                background: #fffbeb;
+                color: #f59e0b;
+            }
+
+            .card-sky {
+                border-bottom: 3px solid #0ea5e9;
+            }
+
+            .icon-sky {
+                background: #f0f9ff;
+                color: #0ea5e9;
+            }
+
+            .status-dot {
+                height: 6px;
+                width: 6px;
+                border-radius: 50%;
+                display: inline-block;
+            }
+
+            .table thead th {
+                background-color: #f8fafc;
+                text-transform: uppercase;
+                font-size: 0.6rem;
+                letter-spacing: 0.025em;
+                color: #64748b;
+                font-weight: 700;
+                border-bottom: 1px solid #e2e8f0;
+            }
+        </style>
+
+        <header class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary px-2 py-1 fw-bold"
+                    style="font-size: 0.6rem; letter-spacing: 0.05em;">SYSTEM MONITOR</span>
+            </div>
+            <h1 style="font-size: 1.75rem; font-weight: 900; color: #0f172a; letter-spacing: -0.02em;">Dashboard</h1>
+            <p class="text-muted m-0 small">Real-time reconciliation insights for <span
+                    class="fw-bold text-dark">MoneyGram International</span></p>
+        </header>
+
+        <div class="row g-3 mb-4">
+            <!-- Card 1: Data Coverage -->
+            <div class="col-md-3">
+                <div class="stats-card card-indigo shadow-sm">
+                    <div class="stats-icon-wrapper icon-indigo">
+                        <i class="bi bi-calendar3-range"></i>
+                    </div>
+                    <div class="stats-label">Date & File Coverage</div>
+                    <div class="stats-value" style="font-size: 0.95rem;" th:text="${minDate + ' — ' + maxDate}">
+                        2024-03-01 — 2024-03-31</div>
+                    <div class="mt-2 pt-2 border-top" style="font-size: 0.65rem; font-weight: 700;">
+                        <div class="row g-0">
+                            <div class="col-6" style="color: #6366f1;">P FILES: <span th:text="${totalPaymentFiles}">0</span></div>
+                            <div class="col-6" style="color: #10b981;">S FILES: <span th:text="${totalSettlementFiles}">0</span></div>
+                        </div>
+                        <div class="row g-0 mt-1">
+                            <div class="col-6" style="color: #4f46e5;">P TRANS: <span th:text="${totalPaymentTxns}">0</span></div>
+                            <div class="col-6" style="color: #059669;">S TRANS: <span th:text="${totalSettlementTxns}">0</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Unreconciled Exposure -->
+            <div class="col-md-3">
+                <div class="stats-card card-rose shadow-sm">
+                    <div class="stats-icon-wrapper icon-rose">
+                        <i class="bi bi-exclamation-octagon"></i>
+                    </div>
+                    <div class="stats-label">Unreconciled Amount</div>
+                    <div class="stats-value"
+                        th:text="${'৳' + #numbers.formatDecimal(totalUnreconciledAmount, 1, 'COMMA', 2, 'POINT')}">
+                        $8,240.50</div>
+                    <div class="stats-footer text-rose" style="color: #f43f5e;">
+                        <span class="status-dot" style="background-color: #f43f5e;"></span>
+                        <span th:text="${totalUnreconciled + ' Records Unreconciled'}">09 Records Outstanding</span>
+                    </div>
+                    <div class="stats-footer text-success mt-1" style="color: #10b981;">
+                        <span class="status-dot" style="background-color: #10b981;"></span>
+                        <span th:text="${totalReconciled + ' Records Reconciled'}">00 Records Reconciled</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: Unreconciled Rate -->
+            <div class="col-md-3">
+                <div class="stats-card card-amber shadow-sm">
+                    <div class="stats-icon-wrapper icon-amber">
+                        <i class="bi bi-percent"></i>
+                    </div>
+                    <div class="stats-label">Unreconciled Rate</div>
+                    <div class="stats-value" th:text="${unreconciledRate + '%'}">0.58%</div>
+                    <div class="stats-footer text-amber" style="color: #f59e0b;">
+                        <i class="bi bi-graph-down-arrow"></i> Volume Disparity
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: Today's Activity -->
+            <div class="col-md-3">
+                <div class="stats-card card-sky shadow-sm">
+                    <div class="stats-icon-wrapper icon-sky">
+                        <i class="bi bi-activity"></i>
+                    </div>
+                    <div class="stats-label">Today's Transactions</div>
+                    <div class="stats-value">1,402</div>
+                    <div class="stats-footer text-sky" style="color: #0ea5e9;">
+                        <i class="bi bi-check-all"></i> Active Processing
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm p-4" style="border-top: 4px solid #10b981 !important; border-radius: 12px;">
-                <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">Success Rate</span>
-                <div class="h3 fw-black my-2" style="font-weight: 800; color: #0f172a;">99.42%</div>
-                <span class="small fw-bold" style="color: #10b981;">● Performing Well</span>
-            </div>
+
+        <div th:if="${message}" class="alert alert-success border-0 shadow-sm py-3 px-4 mb-4"
+            style="border-radius: 12px; font-weight: 600;">
+            <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${message}"></span>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm p-4" style="border-top: 4px solid #2563eb !important; border-radius: 12px;">
-                <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">Exceptions</span>
-                <div class="h3 fw-black my-2" style="font-weight: 800; color: #0f172a;">09</div>
-                <span class="small fw-bold" style="color: #2563eb;">● Awaiting Action</span>
-            </div>
+        <div th:if="${errorMessage}" class="alert alert-danger border-0 shadow-sm py-3 px-4 mb-4"
+            style="border-radius: 12px; font-weight: 600;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${errorMessage}"></span>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm p-4" style="border-top: 4px solid #0ea5e9 !important; border-radius: 12px;">
-                <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">Today's Total</span>
-                <div class="h3 fw-black my-2" style="font-weight: 800; color: #0f172a;">1,402</div>
-                <span class="small fw-bold" style="color: #0ea5e9;">● Active Transactions</span>
-            </div>
-        </div>
+
     </div>
+</body>
 
-    <div th:if="${message}" class="alert alert-success py-2 small" th:text="${message}"></div>
-    <div th:if="${errorMessage}" class="alert alert-danger py-2 small" th:text="${errorMessage}"></div>
+</html>
 
 </div>
 </body>
+
 </html>

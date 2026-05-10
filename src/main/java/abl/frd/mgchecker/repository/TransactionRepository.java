@@ -1,6 +1,7 @@
 package abl.frd.mgchecker.repository;
 
 import abl.frd.mgchecker.enumpack.ReconStatus;
+import abl.frd.mgchecker.enumpack.SourceType;
 import abl.frd.mgchecker.model.TransactionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -58,4 +59,16 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     
     @Query(value = "SELECT file_id FROM transaction WHERE transaction_date = :txnDate AND source_type = 'SETTLEMENT' LIMIT 1", nativeQuery = true)
     Integer findSettlementFileIdByDate(@Param("txnDate") String txnDate);
+
+    @Query(value = "SELECT MIN(transaction_date) FROM transaction WHERE recon_status = 'U'", nativeQuery = true)
+    String findMinUnreconciledDate();
+
+    @Query(value = "SELECT MAX(transaction_date) FROM transaction", nativeQuery = true)
+    String findMaxTransactionDate();
+
+    @Query(value = "SELECT COUNT(*) FROM transaction", nativeQuery = true)
+    Long countTotalTransactions();
+
+    long countByReconStatusAndSourceType(ReconStatus status, SourceType sourceType);
+    long countBySourceType(SourceType sourceType);
 }

@@ -8,6 +8,7 @@ import abl.frd.mgchecker.model.FundEntity;
 import abl.frd.mgchecker.model.TransactionEntity;
 import abl.frd.mgchecker.model.UploadedFileEntity;
 import abl.frd.mgchecker.repository.FundRepository;
+import abl.frd.mgchecker.repository.ReconciliationUnmatchedRepository;
 import abl.frd.mgchecker.repository.TransactionRepository;
 import abl.frd.mgchecker.repository.UploadedFileRepository;
 import abl.frd.mgchecker.service.FileUploadService;
@@ -48,16 +49,19 @@ public class FileUploadController {
     private final UploadedFileRepository uploadedFileRepository;
     private final FundService fundService;
     private final FundRepository fundRepository;
+    private final ReconciliationUnmatchedRepository unmatchedRepo;
 
     public FileUploadController(FileUploadService fileUploadService, TransactionRepository txnRepo,
             ReconciliationService reconciliationService, FundService fundService,
-            UploadedFileRepository uploadedFileRepository, FundRepository fundRepository) {
+            UploadedFileRepository uploadedFileRepository, FundRepository fundRepository,
+            ReconciliationUnmatchedRepository unmatchedRepo) {
         this.fileUploadService = fileUploadService;
         this.txnRepo = txnRepo;
         this.reconciliationService = reconciliationService;
         this.fundService = fundService;
         this.uploadedFileRepository = uploadedFileRepository;
         this.fundRepository = fundRepository;
+        this.unmatchedRepo = unmatchedRepo;
     }
 
     @GetMapping("/")
@@ -344,6 +348,33 @@ public class FileUploadController {
 
     @GetMapping("/files")
     public String showFilesSummary(Model model) {
+        String minDate = txnRepo.findMinUnreconciledDate();
+        String maxDate = txnRepo.findMaxTransactionDate();
+        Long totalUnreconciled = unmatchedRepo.countTotalUnreconciled();
+        BigDecimal totalUnreconciledAmount = unmatchedRepo.sumTotalUnreconciledAmount();
+        Long totalTransactions = txnRepo.countTotalTransactions();
+        long totalPaymentFiles = uploadedFileRepository.countBySourceType(SourceType.PAYMENT);
+        long totalSettlementFiles = uploadedFileRepository.countBySourceType(SourceType.SETTLEMENT);
+        long totalReconciled = txnRepo.countByReconStatusAndSourceType(ReconStatus.M, SourceType.PAYMENT);
+        long totalPaymentTxns = txnRepo.countBySourceType(SourceType.PAYMENT);
+        long totalSettlementTxns = txnRepo.countBySourceType(SourceType.SETTLEMENT);
+
+        double unreconciledRate = 0.0;
+        if (totalTransactions != null && totalTransactions > 0) {
+            unreconciledRate = (totalUnreconciled.doubleValue() / totalPaymentTxns) * 100.0;
+        }
+
+        model.addAttribute("minDate", minDate != null ? minDate : "N/A");
+        model.addAttribute("maxDate", maxDate != null ? maxDate : "N/A");
+        model.addAttribute("totalUnreconciled", totalUnreconciled != null ? totalUnreconciled : 0);
+        model.addAttribute("totalUnreconciledAmount", totalUnreconciledAmount != null ? totalUnreconciledAmount : BigDecimal.ZERO);
+        model.addAttribute("unreconciledRate", String.format("%.2f", unreconciledRate));
+        model.addAttribute("totalPaymentFiles", totalPaymentFiles);
+        model.addAttribute("totalSettlementFiles", totalSettlementFiles);
+        model.addAttribute("totalReconciled", totalReconciled);
+        model.addAttribute("totalPaymentTxns", totalPaymentTxns);
+        model.addAttribute("totalSettlementTxns", totalSettlementTxns);
+
         return "files-summary";
     }
 

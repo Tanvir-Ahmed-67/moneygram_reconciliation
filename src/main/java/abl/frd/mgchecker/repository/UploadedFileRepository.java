@@ -25,4 +25,6 @@ public interface UploadedFileRepository extends JpaRepository<UploadedFileEntity
 
     @Query("SELECT f FROM UploadedFileEntity f WHERE f.sourceType = :sourceType AND NOT EXISTS (SELECT fund FROM FundEntity fund WHERE fund.uploadedFile = f)")
     List<UploadedFileEntity> findUnmappedFilesBySourceType(@org.springframework.data.repository.query.Param("sourceType") SourceType sourceType);
+
+    long countBySourceType(SourceType sourceType);
 }
